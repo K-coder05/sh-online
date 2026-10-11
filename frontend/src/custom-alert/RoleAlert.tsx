@@ -40,6 +40,16 @@ const FascistImagesAltText = [
   "Your secret role is FASCIST. The card shows an iguana in a German military hat and suit with fangs bared.",
 ];
 
+const SecretAgentImagesAltText = LiberalImagesAltText.map((alt) =>
+  alt.replace("LIBERAL", "SECRET AGENT")
+);
+
+const SecretAgentText = [
+  "You are a Liberal with a gun. At any time, you may shoot a player using the SHOOT button.",
+  "Shoot a Fascist and you survive and may shoot again. Shoot Hitler and Liberals win instantly. Shoot a fellow Liberal and you both die.",
+  "The Fascists know who you are (and so does Hitler, in 5-6 player games). Choose your targets carefully!",
+];
+
 const LiberalText = [
   "You win if the board fills with liberal policies, or if Hitler is executed.",
   "You lose if the board fills with fascist policies, or if Hitler is elected chancellor after 3 fascist policies are passed.",
@@ -67,7 +77,7 @@ type RoleAlertProps = {
  * CustomAlert content that shows the player's current role and a quick guide on how to play
  * the game.
  * Parameters:
- *      - {@code role} [String]: The role of the player. Should be either LIBERAL, FASCIST, or HITLER.
+ *      - {@code role} [String]: The role of the player. Should be either LIBERAL, SECRET_AGENT, FASCIST, or HITLER.
  *      - {@code roleID} [int]: The integer roleID of the player. This is used to show unique role cards.
  *          The roleID can range from [1, 6] for LIBERALS, [1, 3] for FASCISTS, and [1] for HITLER. If out of bounds,
  *          the value is set to 1 (default).
@@ -81,6 +91,10 @@ class RoleAlert extends Component<RoleAlertProps> {
       case Role.LIBERAL:
         images = LiberalImages;
         imageAlts = LiberalImagesAltText;
+        break;
+      case Role.SECRET_AGENT:
+        images = LiberalImages;
+        imageAlts = SecretAgentImagesAltText;
         break;
       case Role.FASCIST:
         images = FascistImages;
@@ -107,6 +121,8 @@ class RoleAlert extends Component<RoleAlertProps> {
       roleText = FascistText;
     } else if (this.props.role === Role.LIBERAL) {
       roleText = LiberalText;
+    } else if (this.props.role === Role.SECRET_AGENT) {
+      roleText = SecretAgentText;
     }
 
     const { image, alt } = this.getRoleImageAndAlt();
@@ -115,7 +131,7 @@ class RoleAlert extends Component<RoleAlertProps> {
       <div>
         <div>
           <h2 id="alert-header" className={"left-align"}>
-            YOU ARE: {this.props.role}
+            YOU ARE: {this.props.role?.replace(/_/g, " ")}
           </h2>
           <img id="role" src={image} alt={alt} />
 

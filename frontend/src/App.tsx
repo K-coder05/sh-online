@@ -42,6 +42,7 @@ import {
   STATE_FASCIST_VICTORY_ELECTION,
   STATE_FASCIST_VICTORY_POLICY,
   STATE_LIBERAL_VICTORY_EXECUTION,
+  STATE_LIBERAL_VICTORY_AGENT,
   STATE_LIBERAL_VICTORY_POLICY,
   WEBSOCKET_HEADER,
   SITE_URL,
@@ -66,6 +67,7 @@ import VetoPrompt from "./custom-alert/VetoPrompt";
 import ElectionTrackerAlert from "./custom-alert/ElectionTrackerAlert";
 import PolicyEnactedAlert from "./custom-alert/PolicyEnactedAlert";
 import {
+  SelectAgentShotPrompt,
   SelectExecutionPrompt,
   SelectInvestigationPrompt,
   SelectNominationPrompt,
@@ -86,7 +88,10 @@ import Player from "./player/Player";
 import LoginPageContent from "./LoginPageContent";
 import Cookies from "js-cookie";
 import AnnouncementBox from "./util/AnnouncementBox";
+import { isVictoryState } from "./utils";
 import {
+  AgentShot,
+  AgentShotOutcome,
   GameState,
   LobbyState,
   Role,
@@ -158,6 +163,8 @@ type AppState = {
   drawDeckSize: number;
   discardDeckSize: number;
   snackbarMessage: string;
+  actionPromptOpen: boolean;
+  agentPromptOpen: boolean;
   showAlert: boolean;
   alertContent: JSX.Element;
   showEventBar: boolean;
@@ -187,6 +194,8 @@ const defaultAppState: AppState = {
   drawDeckSize: 17,
   discardDeckSize: 0,
   snackbarMessage: "",
+  actionPromptOpen: false,
+  agentPromptOpen: false,
   showAlert: false,
   alertContent: <div />,
   showEventBar: false,
@@ -204,6 +213,9 @@ class App extends Component<{}, AppState> {
   animationQueue: (() => void)[] = [];
   okMessageListeners: (() => void)[] = [];
   allAnimationsFinished: boolean = true;
+  // Id of the latest secret agent shot seen, and whether an action prompt is currently open.
+  latestAgentShotId: number = 0;
+  showingActionPrompt: boolean = false;
   gameOver: boolean = false;
 
   // noinspection DuplicatedCode
@@ -238,6 +250,7 @@ class App extends Component<{}, AppState> {
     this.addAnimationToQueue = this.addAnimationToQueue.bind(this);
     this.clearAnimationQueue = this.clearAnimationQueue.bind(this);
     this.queueAlert = this.queueAlert.bind(this);
+    this.onClickAgentShoot = this.onClickAgentShoot.bind(this);
     this.showChangeIconAlert = this.showChangeIconAlert.bind(this);
     this.updateChangeIconAlert = this.updateChangeIconAlert.bind(this);
     this.onClickChangeIcon = this.onClickChangeIcon.bind(this);
@@ -1020,6 +1033,243 @@ class App extends Component<{}, AppState> {
   }
 
   /**
+   * Queues the prompt for whatever action the current state needs from this
+   * player (if any), such as nominating a chancellor or voting.
+   * @param newState the game state to prompt for.
+   */
+  queueActionPrompt(newState: GameState): void {
+    const name = this.state.name;
+    const isPresident = name === newState.president;
+    const isChancellor = name === newState.chancellor;
+
+    switch (newState.state) {
+      case STATE_CHANCELLOR_NOMINATION:
+        if (isPresident) {
+          this.queueActionAlert(
+            SelectNominationPrompt(name, newState, this.sendWSCommand)
+          );
+        }
+        break;
+
+      case STATE_CHANCELLOR_VOTING:
+        // Check if the player is dead or has already voted-- if so, do not show the voting prompt.
+        if (
+          newState.players[name][PLAYER_IS_ALIVE] &&
+          !Object.keys(newState.userVotes).includes(name)
+        ) {
+          this.queueActionAlert(
+            <VotingPrompt
+              gameState={newState}
+              sendWSCommand={this.sendWSCommand}
+              user={name}
+            />
+          );
+        }
+        break;
+
+      case STATE_LEGISLATIVE_PRESIDENT:
+        if (isPresident) {
+          if (!newState.presidentChoices) {
+            throw new Error("President choices not found.");
+          }
+          this.queueActionAlert(
+            <PresidentLegislativePrompt
+              policyOptions={newState.presidentChoices}
+              sendWSCommand={this.sendWSCommand}
+            />
+          );
+        }
+        break;
+
+      case STATE_LEGISLATIVE_CHANCELLOR:
+        if (isChancellor) {
+          if (!newState.chancellorChoices) {
+            throw new Error("Chancellor choices not found.");
+          }
+          this.queueActionAlert(
+            <ChancellorLegislativePrompt
+              fascistPolicies={newState.fascistPolicies}
+              showError={(message: string) =>
+                this.setState({ snackbarMessage: message })
+              }
+              policyOptions={newState.chancellorChoices}
+              sendWSCommand={this.sendWSCommand}
+              // Disable if veto has already happened
+              enableVeto={
+                newState.fascistPolicies === 5 && !newState.vetoOccurred
+              }
+            />
+          );
+        }
+        break;
+
+      case STATE_LEGISLATIVE_PRESIDENT_VETO:
+        if (isPresident) {
+          this.queueActionAlert(
+            <VetoPrompt
+              sendWSCommand={this.sendWSCommand}
+              electionTracker={newState.electionTracker}
+            />
+          );
+        }
+        break;
+
+      case STATE_PP_PEEK:
+        if (isPresident) {
+          if (!newState.peek) {
+            throw new Error("Peek policies not found.");
+          }
+          this.queueActionAlert(
+            <PeekPrompt
+              policies={newState.peek}
+              sendWSCommand={this.sendWSCommand}
+            />
+          );
+        }
+        break;
+
+      case STATE_PP_ELECTION:
+        if (isPresident) {
+          this.queueActionAlert(
+            SelectSpecialElectionPrompt(name, newState, this.sendWSCommand)
+          );
+        }
+        break;
+
+      case STATE_PP_EXECUTION:
+        if (isPresident) {
+          this.queueActionAlert(
+            SelectExecutionPrompt(name, newState, this.sendWSCommand)
+          );
+        }
+        break;
+
+      case STATE_PP_INVESTIGATE:
+        if (isPresident) {
+          this.queueActionAlert(
+            SelectInvestigationPrompt(name, newState, this.sendWSCommand)
+          );
+        }
+        break;
+
+      default:
+      // No action needed from this player.
+    }
+  }
+
+  /**
+   * Returns the announcement shown to every player when the secret agent fires.
+   */
+  renderAgentShotAlert(
+    name: string,
+    newState: GameState,
+    shot: AgentShot
+  ): React.JSX.Element {
+    const { shooter, target } = shot;
+    let label: string;
+    let message: string;
+    switch (shot.outcome) {
+      case AgentShotOutcome.HIT_HITLER:
+        label = "HITLER HAS BEEN SHOT";
+        message = `${shooter} is revealed as the Secret Agent and shot ${target}, who was Hitler! Liberals win.`;
+        break;
+      case AgentShotOutcome.HIT_LIBERAL:
+        label = "FRIENDLY FIRE";
+        message = `${shooter} is revealed as the Secret Agent and shot ${target}, a fellow Liberal. Both ${target} and ${shooter} have died.`;
+        break;
+      case AgentShotOutcome.HIT_FASCIST:
+      default:
+        label = "SECRET AGENT STRIKES";
+        message = `${shooter} is revealed as the Secret Agent and shot ${target}, a Fascist! ${shooter} survives and may shoot again.`;
+    }
+
+    const died =
+      shot.outcome !== AgentShotOutcome.HIT_HITLER &&
+      (target === name ||
+        (shooter === name && shot.outcome === AgentShotOutcome.HIT_LIBERAL));
+    if (died) {
+      label = target === name ? "YOU HAVE BEEN SHOT" : "YOU SHOT A LIBERAL";
+      message +=
+        " Dead players may not speak, vote, or run for office. You should not reveal any more information to the group.";
+    }
+
+    return (
+      <ButtonPrompt
+        label={label}
+        footerText={message}
+        buttonOnClick={this.hideAlertAndFinish}
+        buttonText={"OKAY"}
+      >
+        <PlayerDisplay
+          user={name}
+          gameState={newState}
+          showRoles={false}
+          showLabels={false}
+          playerDisabledFilter={DISABLE_EXECUTED_PLAYERS}
+          players={[shooter, target]}
+        />
+      </ButtonPrompt>
+    );
+  }
+
+  /**
+   * Returns true if this player is the living secret agent in an unfinished game.
+   */
+  canAgentShoot(): boolean {
+    const me = this.state.gameState.players[this.state.name];
+    return (
+      me !== undefined &&
+      me.id === Role.SECRET_AGENT &&
+      me.alive &&
+      !isVictoryState(this.state.gameState.state)
+    );
+  }
+
+  /**
+   * Opens the secret agent's shooting prompt.
+   */
+  onClickAgentShoot() {
+    if (!this.showingActionPrompt) {
+      // Nothing to interrupt: queue the prompt like any other.
+      this.queueActionAlert(
+        SelectAgentShotPrompt(
+          this.state.name,
+          this.state.gameState,
+          this.sendWSCommand,
+          () => {
+            this.okMessageListeners = [];
+            this.hideAlertAndFinish();
+          }
+        ),
+        true,
+        true
+      );
+      return;
+    }
+
+    // The agent is in the middle of another action (e.g. voting). Swap the
+    // shooting prompt in; cancelling restores the original prompt.
+    const interruptedPrompt = this.state.alertContent;
+    const interruptedListeners = this.okMessageListeners;
+    this.okMessageListeners = [() => this.hideAlertAndFinish(false)];
+    this.setState({
+      agentPromptOpen: true,
+      alertContent: SelectAgentShotPrompt(
+        this.state.name,
+        this.state.gameState,
+        this.sendWSCommand,
+        () => {
+          this.okMessageListeners = interruptedListeners;
+          this.setState({
+            agentPromptOpen: false,
+            alertContent: interruptedPrompt,
+          });
+        }
+      ),
+    });
+  }
+
+  /**
    * Queues animations for when the game state has changed.
    * @param newState {Object} the new game state sent from the server.
    */
@@ -1027,7 +1277,6 @@ class App extends Component<{}, AppState> {
     let oldState = this.state.gameState;
     let name = this.state.name;
     let isPresident = this.state.name === newState.president;
-    let isChancellor = this.state.name === newState.chancellor;
     let state = newState.state;
 
     // If last state was setup, which indicates that the client is re-entering the game or starting the game, then
@@ -1043,6 +1292,29 @@ class App extends Component<{}, AppState> {
         drawDeckSize: newState.drawSize,
         discardDeckSize: newState.discardSize,
       });
+    }
+
+    // Announce new shots from the secret agent. A shot can invalidate open
+    // prompts (e.g. the president was killed), so dismiss any open prompt and
+    // re-prompt for the current state.
+    const shot = newState.agentShot;
+    const previousShotId = this.latestAgentShotId;
+    this.latestAgentShotId = shot ? shot.id : 0;
+    const isNewShot =
+      shot !== undefined &&
+      shot.id !== previousShotId &&
+      oldState.state !== STATE_SETUP; // Don't replay old shots when (re)joining a game.
+    if (isNewShot) {
+      if (this.showingActionPrompt) {
+        this.okMessageListeners = [];
+        this.hideAlertAndFinish(false);
+      }
+      this.queueEventUpdate("SHOTS FIRED");
+      this.queueAlert(this.renderAgentShotAlert(name, newState, shot!), false);
+      if (newState.state === oldState.state) {
+        // The state-change handling below won't run, so re-prompt here.
+        this.queueActionPrompt(newState);
+      }
     }
 
     // Check for changes in enacted policies and election tracker.
@@ -1116,7 +1388,8 @@ class App extends Component<{}, AppState> {
           if (
             newState.electionTracker === 0 &&
             newState.liberalPolicies === 0 &&
-            newState.fascistPolicies === 0
+            newState.fascistPolicies === 0 &&
+            !isNewShot // A shot can also restart nomination at the start of the game.
           ) {
             // If the game has just started (everything in default state), show the player's role.
             this.queueAlert(
@@ -1137,12 +1410,7 @@ class App extends Component<{}, AppState> {
             "Waiting for president to nominate a chancellor."
           );
 
-          if (isPresident) {
-            //Show the chancellor nomination window.
-            this.queueAlert(
-              SelectNominationPrompt(name, newState, this.sendWSCommand)
-            );
-          }
+          this.queueActionPrompt(newState);
 
           break;
 
@@ -1150,20 +1418,7 @@ class App extends Component<{}, AppState> {
           this.setState({ statusBarText: "" });
           this.queueEventUpdate("VOTING");
           this.queueStatusMessage("Waiting for all players to vote.");
-          // Check if the player is dead or has already voted-- if so, do not show the voting prompt.
-          if (
-            newState.players[name][PLAYER_IS_ALIVE] &&
-            !Object.keys(newState.userVotes).includes(name)
-          ) {
-            this.queueAlert(
-              <VotingPrompt
-                gameState={newState}
-                sendWSCommand={this.sendWSCommand}
-                user={this.state.name}
-              />,
-              true
-            );
-          }
+          this.queueActionPrompt(newState);
 
           break;
 
@@ -1178,17 +1433,7 @@ class App extends Component<{}, AppState> {
             "Waiting for the president to choose a policy to discard."
           );
 
-          if (isPresident) {
-            if (!newState.presidentChoices) {
-              throw new Error("President choices not found.");
-            }
-            this.queueAlert(
-              <PresidentLegislativePrompt
-                policyOptions={newState.presidentChoices}
-                sendWSCommand={this.sendWSCommand}
-              />
-            );
-          }
+          this.queueActionPrompt(newState);
 
           break;
 
@@ -1196,55 +1441,20 @@ class App extends Component<{}, AppState> {
           this.queueStatusMessage(
             "Waiting for the chancellor to choose a policy to enact."
           );
-          if (isChancellor) {
-            if (!newState.chancellorChoices) {
-              throw new Error("Chancellor choices not found.");
-            }
-            this.queueAlert(
-              <ChancellorLegislativePrompt
-                fascistPolicies={newState.fascistPolicies}
-                showError={(message: string) =>
-                  this.setState({ snackbarMessage: message })
-                }
-                policyOptions={newState.chancellorChoices}
-                sendWSCommand={this.sendWSCommand}
-                // Disable if veto has already happened
-                enableVeto={
-                  newState.fascistPolicies === 5 && !newState.vetoOccurred
-                }
-              />
-            );
-          }
+          this.queueActionPrompt(newState);
           break;
 
         case STATE_LEGISLATIVE_PRESIDENT_VETO:
           this.queueStatusMessage(
             "Chancellor has motioned to veto the agenda. Waiting for the president to decide."
           );
-          if (isPresident) {
-            this.queueAlert(
-              <VetoPrompt
-                sendWSCommand={this.sendWSCommand}
-                electionTracker={newState.electionTracker}
-              />,
-              true
-            );
-          }
+          this.queueActionPrompt(newState);
           break;
 
         case STATE_PP_PEEK:
           this.queueEventUpdate("PRESIDENTIAL POWER");
           if (isPresident) {
-            if (!newState.peek) {
-              throw new Error("Peek policies not found.");
-            }
-            this.queueAlert(
-              <PeekPrompt
-                policies={newState.peek}
-                sendWSCommand={this.sendWSCommand}
-              />,
-              true
-            );
+            this.queueActionPrompt(newState);
           } else {
             this.queueStatusMessage(
               "Peek: President is previewing the next 3 policies."
@@ -1255,9 +1465,7 @@ class App extends Component<{}, AppState> {
         case STATE_PP_ELECTION:
           this.queueEventUpdate("PRESIDENTIAL POWER");
           if (isPresident) {
-            this.queueAlert(
-              SelectSpecialElectionPrompt(name, newState, this.sendWSCommand)
-            );
+            this.queueActionPrompt(newState);
           } else {
             this.queueStatusMessage(
               "Special Election: President is choosing the next president."
@@ -1268,10 +1476,7 @@ class App extends Component<{}, AppState> {
         case STATE_PP_EXECUTION:
           this.queueEventUpdate("PRESIDENTIAL POWER");
           if (isPresident) {
-            this.queueAlert(
-              SelectExecutionPrompt(name, newState, this.sendWSCommand),
-              true
-            );
+            this.queueActionPrompt(newState);
           } else {
             this.queueStatusMessage(
               "Execution: President is choosing a player to execute."
@@ -1282,9 +1487,7 @@ class App extends Component<{}, AppState> {
         case STATE_PP_INVESTIGATE:
           this.queueEventUpdate("PRESIDENTIAL POWER");
           if (isPresident) {
-            this.queueAlert(
-              SelectInvestigationPrompt(name, newState, this.sendWSCommand)
-            );
+            this.queueActionPrompt(newState);
           } else {
             this.queueStatusMessage(
               "Investigation: President is choosing a player to investigate."
@@ -1367,6 +1570,7 @@ class App extends Component<{}, AppState> {
           break;
 
         case STATE_LIBERAL_VICTORY_EXECUTION:
+        case STATE_LIBERAL_VICTORY_AGENT:
         case STATE_FASCIST_VICTORY_ELECTION:
         case STATE_FASCIST_VICTORY_POLICY:
         case STATE_LIBERAL_VICTORY_POLICY:
@@ -1403,11 +1607,16 @@ class App extends Component<{}, AppState> {
           let liberalVictoryPolicy = state === STATE_LIBERAL_VICTORY_POLICY;
           let liberalVictoryExecution =
             state === STATE_LIBERAL_VICTORY_EXECUTION;
+          let liberalVictoryAgent = state === STATE_LIBERAL_VICTORY_AGENT;
           let playerID = newState.players[name].id;
+          let isLiberalTeam =
+            playerID === Role.LIBERAL || playerID === Role.SECRET_AGENT;
           let playerWon =
-            (playerID === Role.LIBERAL &&
-              (liberalVictoryExecution || liberalVictoryPolicy)) ||
-            (playerID !== Role.LIBERAL &&
+            (isLiberalTeam &&
+              (liberalVictoryExecution ||
+                liberalVictoryPolicy ||
+                liberalVictoryAgent)) ||
+            (!isLiberalTeam &&
               (fascistVictoryElection || fascistVictoryPolicy));
 
           // Register player victory/loss with analytics.
@@ -1445,6 +1654,8 @@ class App extends Component<{}, AppState> {
               victoryMessage = "Liberals successfully passed five policies!";
             } else if (liberalVictoryExecution) {
               victoryMessage = "Liberals successfully executed Hitler!";
+            } else if (liberalVictoryAgent) {
+              victoryMessage = "The Secret Agent shot Hitler!";
             }
           }
           if (DEBUG) {
@@ -1477,6 +1688,7 @@ class App extends Component<{}, AppState> {
                     this.reconnectOnConnectionClosed = true;
                     this.tryOpenWebSocket(this.state.name, this.state.lobby);
                     this.hideAlertAndFinish();
+                    this.latestAgentShotId = 0;
                     this.setState({
                       page: PAGE.LOBBY,
                       gameState: DEFAULT_GAME_STATE,
@@ -1624,7 +1836,12 @@ class App extends Component<{}, AppState> {
    *           Otherwise, immediately queues the next animation.
    */
   hideAlertAndFinish(delayExit = true) {
-    this.setState({ showAlert: false });
+    this.showingActionPrompt = false;
+    this.setState({
+      showAlert: false,
+      actionPromptOpen: false,
+      agentPromptOpen: false,
+    });
     if (delayExit) {
       setTimeout(() => {
         this.setState({ alertContent: <div /> }); // reset the alert box contents
@@ -1682,6 +1899,38 @@ class App extends Component<{}, AppState> {
   }
 
   /**
+   * Like {@code queueAlert}, but for prompts that ask this player to act. The
+   * prompt is skipped if a secret agent shot happens before it is shown, since
+   * the shot may have made it invalid.
+   * @param content {html} the contents to be shown in the AlertBox.
+   * @param closeOnOK {boolean} whether to close the alert when the server responds with an ok message. (default = true)
+   * @param isAgentPrompt {boolean} whether this is the secret agent's shooting prompt. (default = false)
+   */
+  queueActionAlert(
+    content: React.JSX.Element,
+    closeOnOK = true,
+    isAgentPrompt = false
+  ) {
+    const shotId = this.latestAgentShotId;
+    this.addAnimationToQueue(() => {
+      if (shotId !== this.latestAgentShotId) {
+        this.onAnimationFinish(); // Stale: a shot happened since this was queued.
+        return;
+      }
+      this.showingActionPrompt = true;
+      this.setState({
+        alertContent: content,
+        showAlert: true,
+        actionPromptOpen: true,
+        agentPromptOpen: isAgentPrompt,
+      });
+      if (closeOnOK) {
+        this.addServerOKListener(() => this.hideAlertAndFinish(false));
+      }
+    });
+  }
+
+  /**
    * Adds an update to the status message to the animation queue.
    * @param message {String} the text for the status bar to display.
    * @effects Adds a new function to the animation queue that, when called, updates {@code this.state.statusBarText} to
@@ -1706,6 +1955,13 @@ class App extends Component<{}, AppState> {
 
         <CustomAlert show={this.state.showAlert}>
           {this.state.alertContent}
+          {this.canAgentShoot() &&
+            this.state.actionPromptOpen &&
+            !this.state.agentPromptOpen && (
+              <button onClick={this.onClickAgentShoot}>
+                SHOOT (SECRET AGENT)
+              </button>
+            )}
         </CustomAlert>
 
         <EventBar
@@ -1759,6 +2015,16 @@ class App extends Component<{}, AppState> {
                   {" "}
                   END TERM
                 </button>
+
+                {this.state.gameState.players[this.state.name]?.id ===
+                  Role.SECRET_AGENT && (
+                  <button
+                    disabled={!this.canAgentShoot() || this.state.showAlert}
+                    onClick={this.onClickAgentShoot}
+                  >
+                    SHOOT
+                  </button>
+                )}
 
                 <PlayerPolicyStatus
                   numFascistPolicies={this.state.fascistPolicies}

@@ -4,5 +4,6 @@ public enum Identity {
     UNASSIGNED,
     HITLER,
     FASCIST,
-    LIBERAL
+    LIBERAL,
+    SECRET_AGENT    // Liberal-aligned. May shoot players at any time (see SecretHitlerGame.agentShoot).
 }

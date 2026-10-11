@@ -71,6 +71,7 @@ public class SecretHitlerServer {
     public static final String COMMAND_REGISTER_SPECIAL_ELECTION = "register-special-election";
     public static final String COMMAND_GET_INVESTIGATION = "get-investigation";
     public static final String COMMAND_REGISTER_PEEK = "register-peek";
+    public static final String COMMAND_AGENT_SHOOT = "agent-shoot";
 
     public static final String COMMAND_END_TERM = "end-term";
 
@@ -702,6 +703,10 @@ public class SecretHitlerServer {
                     case COMMAND_REGISTER_PEEK:
                         verifyIsPresident(name, lobby);
                         lobby.game().endPeek();
+                        break;
+
+                    case COMMAND_AGENT_SHOOT: // params: PARAM_TARGET (String). The game verifies the sender is the agent.
+                        lobby.game().agentShoot(name, message.getString(PARAM_TARGET));
                         break;
 
                     case COMMAND_END_TERM:

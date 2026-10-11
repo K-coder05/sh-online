@@ -5,6 +5,7 @@ export const isVictoryState = (lobbyState: LobbyState): boolean => {
     lobbyState === LobbyState.FASCIST_VICTORY_ELECTION ||
     lobbyState === LobbyState.FASCIST_VICTORY_POLICY ||
     lobbyState === LobbyState.LIBERAL_VICTORY_EXECUTION ||
+    lobbyState === LobbyState.LIBERAL_VICTORY_AGENT ||
     lobbyState === LobbyState.LIBERAL_VICTORY_POLICY
   );
 };

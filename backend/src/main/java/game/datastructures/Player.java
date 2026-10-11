@@ -60,6 +60,10 @@ public class Player implements Serializable {
         return this.id.equals(Identity.HITLER);
     }
 
+    public boolean isSecretAgent() {
+        return this.id.equals(Identity.SECRET_AGENT);
+    }
+
     public void kill() {
         isAlive = false;
     }

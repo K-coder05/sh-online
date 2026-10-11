@@ -19,6 +19,8 @@ export const enum WSCommandType {
   // Policy action
   REGISTER_CHANCELLOR_CHOICE = "register-chancellor-choice",
   REGISTER_PRESIDENT_CHOICE = "register-president-choice",
+  // Secret agent action
+  AGENT_SHOOT = "agent-shoot",
 }
 
 /** All possible commands and associated parameters. */
@@ -37,7 +39,8 @@ export type ServerRequestPayload =
   | { command: WSCommandType.GET_INVESTIGATION; target: string }
   | { command: WSCommandType.REGISTER_VOTE; vote: boolean }
   | { command: WSCommandType.REGISTER_CHANCELLOR_CHOICE; choice: number }
-  | { command: WSCommandType.REGISTER_PRESIDENT_CHOICE; choice: number };
+  | { command: WSCommandType.REGISTER_PRESIDENT_CHOICE; choice: number }
+  | { command: WSCommandType.AGENT_SHOOT; target: string };
 
 export type SendWSCommand = (payload: ServerRequestPayload) => void;
 

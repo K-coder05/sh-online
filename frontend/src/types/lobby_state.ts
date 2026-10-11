@@ -14,6 +14,7 @@ export enum LobbyState {
   POST_LEGISLATIVE = "POST_LEGISLATIVE", // Waiting for the President to end their turn.
   LIBERAL_VICTORY_POLICY = "LIBERAL_VICTORY_POLICY", // Liberal Party won through enacting Liberal policies.
   LIBERAL_VICTORY_EXECUTION = "LIBERAL_VICTORY_EXECUTION", // Liberal Party won through executing Hitler.
+  LIBERAL_VICTORY_AGENT = "LIBERAL_VICTORY_AGENT", // Liberal Party won through the secret agent shooting Hitler.
   FASCIST_VICTORY_POLICY = "FASCIST_VICTORY_POLICY", // Fascist Party won through enacting Fascist policies.
   FASCIST_VICTORY_ELECTION = "FASCIST_VICTORY_ELECTION", // Fascist Party won by successfully electing Hitler chancellor.
 }
@@ -22,6 +23,20 @@ export type PlayerState = {
   id?: Role;
   alive: boolean;
   investigated: boolean;
+};
+
+export const enum AgentShotOutcome {
+  HIT_FASCIST = "HIT_FASCIST", // Target was a fascist. The agent survives and may shoot again.
+  HIT_HITLER = "HIT_HITLER", // Target was Hitler. Liberals win.
+  HIT_LIBERAL = "HIT_LIBERAL", // Target was a liberal. Both the target and the agent died.
+}
+
+/** The most recent shot fired by the secret agent. {@code id} increases with each shot. */
+export type AgentShot = {
+  id: number;
+  shooter: string;
+  target: string;
+  outcome: AgentShotOutcome;
 };
 
 export type GameState = {
@@ -51,6 +66,7 @@ export type GameState = {
   lastPolicy: string;
   vetoOccurred: boolean;
   peek?: PolicyType[];
+  agentShot?: AgentShot;
 
   usernames?: string[];
   /** Maps from usernames to icon keys */

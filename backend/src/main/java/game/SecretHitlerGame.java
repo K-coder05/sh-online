@@ -92,6 +92,9 @@ public class SecretHitlerGame implements Serializable {
 
     private HashMap<String, Boolean> voteMap;
 
+    // The most recent shot fired by the secret agent (null if none yet).
+    private AgentShot lastAgentShot;
+
     // </editor-fold>
 
     /////////////////// Public Observers
@@ -151,6 +154,13 @@ public class SecretHitlerGame implements Serializable {
 
     public boolean didVetoOccurThisTurn() {
         return didVetoOccurThisTurn;
+    }
+
+    /**
+     * @return the most recent shot fired by the secret agent, or null if none.
+     */
+    public AgentShot getLastAgentShot() {
+        return lastAgentShot;
     }
 
     // </editor-fold>
@@ -294,11 +304,12 @@ public class SecretHitlerGame implements Serializable {
      * 
      * @requires the number of players is between 5 and 10, inclusive.
      * @modifies this
-     * @effects all Players in playerList are assigned either LIBERAL, FASCIST, or
-     *          HITLER.
+     * @effects all Players in playerList are assigned either LIBERAL, SECRET_AGENT,
+     *          FASCIST, or HITLER.
      *          The number of each is given by the following table:
      *          # players: 5 6 7 8 9 10
-     *          # liberals: 3 4 4 5 5 6
+     *          # liberals: 2 3 3 4 4 5
+     *          # agents:   1 1 1 1 1 1
      *          # fascists: 1 1 2 2 3 3
      *          # hitler: 1 1 1 1 1 1
      */
@@ -326,6 +337,15 @@ public class SecretHitlerGame implements Serializable {
             if (!playerList.get(randomIndex).isFascist()) { // If player has not already been set
                 playerList.get(randomIndex).setIdentity(Identity.FASCIST);
                 numFascistsToSet--;
+            }
+        }
+
+        // Randomly convert one liberal into the secret agent.
+        while (true) {
+            int randomIndex = random.nextInt(players);
+            if (playerList.get(randomIndex).getIdentity() == Identity.LIBERAL) {
+                playerList.get(randomIndex).setIdentity(Identity.SECRET_AGENT);
+                break;
             }
         }
     }
@@ -380,6 +400,7 @@ public class SecretHitlerGame implements Serializable {
         return state == GameState.FASCIST_VICTORY_ELECTION
                 || state == GameState.FASCIST_VICTORY_POLICY
                 || state == GameState.LIBERAL_VICTORY_EXECUTION
+                || state == GameState.LIBERAL_VICTORY_AGENT
                 || state == GameState.LIBERAL_VICTORY_POLICY;
     }
 
@@ -489,7 +510,18 @@ public class SecretHitlerGame implements Serializable {
         }
 
         voteMap.put(username, vote);
+        tallyVotesIfComplete();
+    }
 
+    /**
+     * Resolves the open vote once every living player has voted.
+     *
+     * @modifies this
+     * @effects if all living players have voted, either starts the legislative
+     *          session (or ends the game if Hitler was elected) or advances the
+     *          election tracker.
+     */
+    private void tallyVotesIfComplete() {
         // Count up votes and check if all votes have been submitted.
         boolean allPlayersHaveVoted = true;
         int totalVotes = 0;
@@ -594,6 +626,10 @@ public class SecretHitlerGame implements Serializable {
     public void endPresidentialTerm() {
         if (this.state != GameState.POST_LEGISLATIVE) {
             throw new IllegalStateException();
+        }
+
+        if (electedPresident != null && !getPlayer(electedPresident).isAlive()) {
+            electedPresident = null; // The elected president was shot before taking office.
         }
 
         if (electedPresident != null) { // If the PRESIDENTIAL_POWER_ELECTION was active, chooses the elected president.
@@ -1005,6 +1041,105 @@ public class SecretHitlerGame implements Serializable {
 
         electedPresident = username;
         concludePresidentialActions();
+    }
+
+    // </editor-fold>
+
+    /////////////////// Secret Agent
+    // <editor-fold desc="Secret Agent">
+
+    /**
+     * The secret agent shoots a player.
+     *
+     * @param shooter the username of the secret agent.
+     * @param target  the username of the player to shoot.
+     * @throws IllegalStateException    if the game has finished.
+     * @throws IllegalArgumentException if {@code shooter} is not the living secret
+     *                                  agent, or if {@code target} does not exist,
+     *                                  is dead, or is the shooter.
+     * @modifies this
+     * @effects kills the target. If the target was Hitler, advances the state to
+     *          LIBERAL_VICTORY_AGENT. If the target was a liberal, the agent also
+     *          dies.
+     * @return a record of the shot.
+     */
+    public AgentShot agentShoot(String shooter, String target) {
+        if (hasGameFinished()) {
+            throw new IllegalStateException("Cannot shoot once the game has finished.");
+        } else if (!hasPlayer(shooter) || !getPlayer(shooter).isSecretAgent()) {
+            throw new IllegalArgumentException("Only the secret agent can shoot.");
+        } else if (!getPlayer(shooter).isAlive()) {
+            throw new IllegalArgumentException("The secret agent is dead and cannot shoot.");
+        } else if (!hasPlayer(target)) {
+            throw new IllegalArgumentException("Player " + target + " does not exist.");
+        } else if (!getPlayer(target).isAlive()) {
+            throw new IllegalArgumentException("Cannot shoot " + target + " because they are not alive.");
+        } else if (shooter.equals(target)) {
+            throw new IllegalArgumentException("The secret agent cannot shoot themselves.");
+        }
+
+        Player victim = getPlayer(target);
+        victim.kill();
+        if (victim.isHitler()) {
+            this.lastState = this.state;
+            state = GameState.LIBERAL_VICTORY_AGENT;
+            return recordShot(shooter, target, AgentShot.Outcome.HIT_HITLER);
+        }
+        AgentShot.Outcome outcome = AgentShot.Outcome.HIT_FASCIST;
+        if (!victim.isFascist()) { // Shot a fellow liberal: the agent dies too.
+            getPlayer(shooter).kill();
+            outcome = AgentShot.Outcome.HIT_LIBERAL;
+        }
+        dissolveGovernmentIfBroken();
+        if (state == GameState.CHANCELLOR_VOTING) { // A dead voter may have been the last one outstanding.
+            tallyVotesIfComplete();
+        }
+        return recordShot(shooter, target, outcome);
+    }
+
+    /**
+     * Records a shot as the most recent one.
+     *
+     * @modifies this
+     * @effects sets the last agent shot, numbering it one higher than the previous.
+     * @return the recorded shot.
+     */
+    private AgentShot recordShot(String shooter, String target, AgentShot.Outcome outcome) {
+        int id = lastAgentShot == null ? 1 : lastAgentShot.getId() + 1;
+        lastAgentShot = new AgentShot(id, shooter, target, outcome);
+        return lastAgentShot;
+    }
+
+    /**
+     * Ends the current presidential term early if the sitting government lost a
+     * member it still needs.
+     *
+     * @modifies this
+     * @effects if the current president is dead, or the current chancellor is dead
+     *          while still needed for the vote or legislative session, discards
+     *          any policies in hand, ends the term and passes the presidency on.
+     */
+    private void dissolveGovernmentIfBroken() {
+        boolean inLegislativeSession = state == GameState.LEGISLATIVE_PRESIDENT
+                || state == GameState.LEGISLATIVE_CHANCELLOR
+                || state == GameState.LEGISLATIVE_PRESIDENT_VETO;
+        boolean chancellorNeeded = state == GameState.CHANCELLOR_VOTING || inLegislativeSession;
+        boolean presidentDead = !getPlayer(currentPresident).isAlive();
+        boolean chancellorDead = currentChancellor != null && !getPlayer(currentChancellor).isAlive();
+        if (!presidentDead && !(chancellorNeeded && chancellorDead)) {
+            return;
+        }
+
+        if (inLegislativeSession) {
+            while (!legislativePolicies.isEmpty()) {
+                discard.add(legislativePolicies.remove(0));
+            }
+        } else if (state == GameState.CHANCELLOR_VOTING) {
+            voteMap = new HashMap<>(); // The vote was abandoned.
+        }
+        didVetoOccurThisTurn = false;
+        concludePresidentialActions();
+        endPresidentialTerm();
     }
 
     // </editor-fold>

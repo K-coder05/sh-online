@@ -7,4 +7,5 @@ export const enum Role {
   LIBERAL = "LIBERAL",
   FASCIST = "FASCIST",
   HITLER = "HITLER",
+  SECRET_AGENT = "SECRET_AGENT",
 }

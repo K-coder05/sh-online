@@ -474,7 +474,7 @@ public class CpuPlayer implements Serializable, Comparable<CpuPlayer> {
     if (policies.get(0).getType() == policies.get(1).getType()) {
       // Both policies are the same.
       Policy.Type policyType = policies.get(0).getType();
-      if (canVeto && policyType == Policy.Type.FASCIST && myId == Identity.LIBERAL) {
+      if (canVeto && policyType == Policy.Type.FASCIST && !myPlayerData.isFascist()) {
         // We are liberal and there are two fascist policies, so we should veto.
         game.chancellorVeto();
         return true;
@@ -517,13 +517,12 @@ public class CpuPlayer implements Serializable, Comparable<CpuPlayer> {
       return false; // We are not president, no action required
     }
 
-    Identity myId = myPlayerData.getIdentity();
     List<Policy> policies = game.getChancellorLegislativeChoices();
 
     // Check if policies are the same
     if (policies.get(0).getType() == policies.get(1).getType()) {
       Policy.Type policyType = policies.get(0).getType();
-      if (myId == Identity.LIBERAL) {
+      if (!myPlayerData.isFascist()) {
         boolean shouldAllowVeto = policyType == Policy.Type.FASCIST;
         // Allow veto for fascist policies, deny for liberal policies
         game.presidentialVeto(shouldAllowVeto);
@@ -556,7 +555,7 @@ public class CpuPlayer implements Serializable, Comparable<CpuPlayer> {
     List<Player> playerList = removeDeadPlayersAndSelf(game.getPlayerList());
     String selectedPlayer = null;
     while (selectedPlayer == null || game.getPlayer(selectedPlayer).hasBeenInvestigated()) {
-      if (myPlayerData.getIdentity() == Identity.LIBERAL) {
+      if (!myPlayerData.isFascist()) {
         selectedPlayer = chooseRandomPlayerWeighted(playerList, 1f, 0, -0.4f, 0.5f);
       } else {
         // Totally randomize selection
@@ -576,7 +575,7 @@ public class CpuPlayer implements Serializable, Comparable<CpuPlayer> {
     // Liberals should avoid suspicious players, while fascists should
     // slightly avoid liberals. For both, preferentially choose players.
     List<Player> playerList = removeDeadPlayersAndSelf(game.getPlayerList());
-    if (myPlayerData.getIdentity() == Identity.LIBERAL) {
+    if (!myPlayerData.isFascist()) {
       selectedPlayer = chooseRandomPlayerWeighted(playerList, -0.8f, 0, 1f, 0.5f);
     } else {
       selectedPlayer = chooseRandomPlayerWeighted(playerList, 1f, 1f, 0.5f, 0.5f);
@@ -594,7 +593,7 @@ public class CpuPlayer implements Serializable, Comparable<CpuPlayer> {
     List<Player> playerList = removeDeadPlayersAndSelf(game.getPlayerList());
     // Keep going until a valid player is selected
     while (selectedPlayer == null || !game.getPlayer(selectedPlayer).isAlive()) {
-      if (myPlayerData.getIdentity() == Identity.LIBERAL) {
+      if (!myPlayerData.isFascist()) {
         // Aim for fascist or suspicious players
         // TODO: Keep a pool of players that are tested/untested for hitler role?
         selectedPlayer = chooseRandomPlayerWeighted(playerList, 1f, 1f, -0.4f, 0);

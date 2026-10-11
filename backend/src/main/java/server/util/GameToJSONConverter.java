@@ -1,5 +1,6 @@
 package server.util;
 
+import game.AgentShot;
 import game.GameState;
 import game.SecretHitlerGame;
 import game.datastructures.Identity;
@@ -57,6 +58,10 @@ public class GameToJSONConverter {
      *         game state LEGISLATIVE_CHANCELLOR).
      *         - {@code veto-occurred}: Set to true if a veto has already taken
      *         place on this legislative session.
+     *         - {@code agentShot}: The most recent shot fired by the secret agent
+     *         (omitted if none), with properties {@code id} (int, increases with
+     *         each shot), {@code shooter}, {@code target}, and {@code outcome}
+     *         (HIT_FASCIST, HIT_HITLER, or HIT_LIBERAL).
      */
     public static JSONObject convert(SecretHitlerGame game, String userName) {
         if (game == null) {
@@ -114,6 +119,16 @@ public class GameToJSONConverter {
         out.put("liberalPolicies", game.getNumLiberalPolicies());
         out.put("userVotes", game.getVotes());
         out.put("vetoOccurred", game.didVetoOccurThisTurn());
+
+        AgentShot shot = game.getLastAgentShot();
+        if (shot != null) {
+            JSONObject shotObj = new JSONObject();
+            shotObj.put("id", shot.getId());
+            shotObj.put("shooter", shot.getShooter());
+            shotObj.put("target", shot.getTarget());
+            shotObj.put("outcome", shot.getOutcome().toString());
+            out.put("agentShot", shotObj);
+        }
 
         if (game.getState() == GameState.LEGISLATIVE_PRESIDENT) {
             out.put("presidentChoices", convertPolicyListToStringArray(game.getPresidentLegislativeChoices()));

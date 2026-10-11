@@ -20,6 +20,7 @@ import portraits, {portraitsAltText} from "../assets";
 const LIBERAL = "LIBERAL";
 const FASCIST = "FASCIST";
 const HITLER = "HITLER";
+const SECRET_AGENT = "SECRET_AGENT";
 
 /**
  * A visual representation of a player, including their name and (optionally) their role.
@@ -41,6 +42,7 @@ class Player extends Component {
     getIcon() {
         switch (this.props.role) {
             case LIBERAL:
+            case SECRET_AGENT:
                 return IconLiberal;
             case FASCIST:
                 return IconFascist;
@@ -56,15 +58,16 @@ class Player extends Component {
      * @return {String} text where only the first character is uppercase.
      */
     capitalizeFirstOnly(text) {
+        text = text.replace(/_/g, " ");
         return text.charAt(0).toUpperCase() + text.toLowerCase().substr(1);
     }
 
     /**
      * Changes the className based on the role (so that liberals can have blue text coloring).
-     * @return {string} " liberal-text" if the role is LIBERAL. Otherwise, returns "".
+     * @return {string} " liberal-text" if the role is LIBERAL or SECRET_AGENT. Otherwise, returns "".
      */
     getRoleClass() {
-        if(this.props.role === LIBERAL) {
+        if(this.props.role === LIBERAL || this.props.role === SECRET_AGENT) {
             return " liberal-text";
         } else {
             return "";

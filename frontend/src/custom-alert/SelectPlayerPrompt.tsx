@@ -12,7 +12,8 @@ type AllowedWSCommandTypes =
   | WSCommandType.NOMINATE_CHANCELLOR
   | WSCommandType.REGISTER_EXECUTION
   | WSCommandType.REGISTER_SPECIAL_ELECTION
-  | WSCommandType.GET_INVESTIGATION;
+  | WSCommandType.GET_INVESTIGATION
+  | WSCommandType.AGENT_SHOOT;
 
 type SelectPlayerPromptProps = {
   user: string;
@@ -213,6 +214,44 @@ export const SelectExecutionPrompt = (
             <p className={"left-align highlight"}>
               The game ends and Liberals win if Hitler is executed.
             </p>
+          </>
+        );
+      }}
+    />
+  );
+};
+
+export const SelectAgentShotPrompt = (
+  user: string,
+  gameState: GameState,
+  sendWSCommand: SendWSCommand,
+  onCancel: () => void
+): ReactElement => {
+  return (
+    <SelectPlayerPrompt
+      user={user}
+      gameState={gameState}
+      sendWSCommand={sendWSCommand}
+      commandType={WSCommandType.AGENT_SHOOT}
+      disabledFilter={DISABLE_EXECUTED_PLAYERS}
+      includeUser={false}
+      label={"SECRET AGENT"}
+      buttonText={"SHOOT"}
+      renderHeader={() => {
+        return (
+          <>
+            <p className={"left-align"}>
+              Choose a player to shoot. Your identity will be revealed to
+              everyone.
+            </p>
+            <p className={"left-align"}>
+              Shoot a Fascist and you survive and may shoot again. Shoot Hitler
+              and Liberals win.
+            </p>
+            <p className={"left-align highlight"}>
+              If you shoot a fellow Liberal, you both die!
+            </p>
+            <button onClick={onCancel}>CANCEL</button>
           </>
         );
       }}

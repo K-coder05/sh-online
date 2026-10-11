@@ -14,6 +14,7 @@ public enum GameState {
     POST_LEGISLATIVE,               // Waiting for the President to end their turn.
     LIBERAL_VICTORY_POLICY,         // Liberal Party won through enacting Liberal policies.
     LIBERAL_VICTORY_EXECUTION,      // Liberal Party won through executing Hitler.
+    LIBERAL_VICTORY_AGENT,          // Liberal Party won through the secret agent shooting Hitler.
     FASCIST_VICTORY_POLICY,         // Fascist Party won through enacting Fascist policies.
     FASCIST_VICTORY_ELECTION        // Fascist Party won by successfully electing Hitler chancellor.
 }
