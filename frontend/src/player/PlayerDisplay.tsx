@@ -17,7 +17,7 @@ import {
 } from "../constants";
 import "./PlayerDisplay.css";
 import { GameState, Role } from "../types";
-import { doesHitlerKnowFascists, isVictoryState } from "../utils";
+import { doesHitlerKnowFascists, isGhost, isVictoryState } from "../utils";
 
 // <editor-fold desc="Player Filters">
 
@@ -309,6 +309,7 @@ export default function PlayerDisplay(
               showVote={showVote}
               vote={props.gameState.userVotes[playerName]}
               icon={props.gameState.icon[playerName]}
+              isGhost={isGhost(playerName, props.gameState)}
             />
           </div>
         );

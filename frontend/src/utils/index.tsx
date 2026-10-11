@@ -11,6 +11,16 @@ export const isVictoryState = (lobbyState: LobbyState): boolean => {
 };
 
 /**
+ * Returns true if the player is a ghost: a dead player in an unfinished game.
+ */
+export const isGhost = (name: string, gameState: GameState): boolean => {
+  const player = gameState.players[name];
+  return (
+    player !== undefined && !player.alive && !isVictoryState(gameState.state)
+  );
+};
+
+/**
  * Returns true if players with the Hitler role should know which players have
  * the Fascist role.
  */

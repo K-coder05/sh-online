@@ -21,6 +21,9 @@ export const enum WSCommandType {
   REGISTER_PRESIDENT_CHOICE = "register-president-choice",
   // Secret agent action
   AGENT_SHOOT = "agent-shoot",
+  // Ghost (dead player) actions
+  GHOST_HECKLE = "ghost-heckle",
+  GHOST_WHISPER = "ghost-whisper",
 }
 
 /** All possible commands and associated parameters. */
@@ -40,7 +43,9 @@ export type ServerRequestPayload =
   | { command: WSCommandType.REGISTER_VOTE; vote: boolean }
   | { command: WSCommandType.REGISTER_CHANCELLOR_CHOICE; choice: number }
   | { command: WSCommandType.REGISTER_PRESIDENT_CHOICE; choice: number }
-  | { command: WSCommandType.AGENT_SHOOT; target: string };
+  | { command: WSCommandType.AGENT_SHOOT; target: string }
+  | { command: WSCommandType.GHOST_HECKLE; message: string }
+  | { command: WSCommandType.GHOST_WHISPER; target: string; message: string };
 
 export type SendWSCommand = (payload: ServerRequestPayload) => void;
 
@@ -55,6 +60,7 @@ export type SendWSCommand = (payload: ServerRequestPayload) => void;
  * @param {string} target The target of the command. Used for powers and nominations.
  * @param {boolean} vote The vote to register.
  * @param {number} choice The policy index to register.
+ * @param {string} message The text of a ghost's heckle or whisper.
  */
 export type WSCommand = {
   name: string;

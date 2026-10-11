@@ -18,6 +18,26 @@
     background-color: var(--selectionHover);
 }
 
+/* Ghosts (dead players) drift around the room. */
+#player-container.ghost {
+    opacity: 0.6;
+    animation: ghost-wander 6s ease-in-out infinite;
+}
+
+@keyframes ghost-wander {
+    0%   {transform: translate(0, 0) rotate(0deg);}
+    25%  {transform: translate(1vmin, -1.5vmin) rotate(3deg);}
+    50%  {transform: translate(0, -2.5vmin) rotate(0deg);}
+    75%  {transform: translate(-1vmin, -1.5vmin) rotate(-3deg);}
+    100% {transform: translate(0, 0) rotate(0deg);}
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #player-container.ghost {
+        animation: none;
+    }
+}
+
 #player-icon {
     position: absolute;
     width: 82%;

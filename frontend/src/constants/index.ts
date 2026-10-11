@@ -33,6 +33,8 @@ export const MAX_FAILED_CONNECTIONS = 5;
 export const LOBBY_CODE_LENGTH = 4;
 export const SERVER_TIMEOUT = 4000;
 export const PING_INTERVAL = 50000;
+/** Must match SecretHitlerGame.MAX_GHOST_MESSAGE_LENGTH on the server. */
+export const MAX_GHOST_MESSAGE_LENGTH = 140;
 
 //////// Game Constants
 export const MIN_PLAYERS = 5;

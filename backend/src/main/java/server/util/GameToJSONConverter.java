@@ -2,10 +2,12 @@ package server.util;
 
 import game.AgentShot;
 import game.GameState;
+import game.GhostMessage;
 import game.SecretHitlerGame;
 import game.datastructures.Identity;
 import game.datastructures.Player;
 import game.datastructures.Policy;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.List;
@@ -62,6 +64,15 @@ public class GameToJSONConverter {
      *         (omitted if none), with properties {@code id} (int, increases with
      *         each shot), {@code shooter}, {@code target}, and {@code outcome}
      *         (HIT_FASCIST, HIT_HITLER, or HIT_LIBERAL).
+     *         - {@code heckles}: The most recent heckles from ghosts (dead
+     *         players), oldest first. Each has properties {@code id} (int,
+     *         increases with each heckle), {@code ghost}, and {@code text}.
+     *         - {@code whispers}: The whispers sent or received by the user,
+     *         oldest first, with properties {@code id} (int, increases with each
+     *         whisper), {@code ghost}, {@code recipient}, and {@code text}.
+     *         Whispers are never sent to anyone else.
+     *         - {@code canWhisper}: Whether the user is a ghost who has not yet
+     *         whispered this round.
      */
     public static JSONObject convert(SecretHitlerGame game, String userName) {
         if (game == null) {
@@ -130,6 +141,10 @@ public class GameToJSONConverter {
             out.put("agentShot", shotObj);
         }
 
+        out.put("heckles", convertGhostMessages(game.getHeckles()));
+        out.put("whispers", convertGhostMessages(game.getWhispersFor(userName)));
+        out.put("canWhisper", game.canWhisper(userName));
+
         if (game.getState() == GameState.LEGISLATIVE_PRESIDENT) {
             out.put("presidentChoices", convertPolicyListToStringArray(game.getPresidentLegislativeChoices()));
         }
@@ -140,6 +155,26 @@ public class GameToJSONConverter {
             out.put("peek", convertPolicyListToStringArray(game.getPeek()));
         }
 
+        return out;
+    }
+
+    /**
+     * Converts ghost messages into a JSONArray of objects with properties
+     * {@code id}, {@code ghost}, {@code text}, and (for whispers only)
+     * {@code recipient}.
+     */
+    private static JSONArray convertGhostMessages(List<GhostMessage> messages) {
+        JSONArray out = new JSONArray();
+        for (GhostMessage message : messages) {
+            JSONObject obj = new JSONObject();
+            obj.put("id", message.getId());
+            obj.put("ghost", message.getGhost());
+            obj.put("text", message.getText());
+            if (message.isWhisper()) {
+                obj.put("recipient", message.getRecipient());
+            }
+            out.put(obj);
+        }
         return out;
     }
 

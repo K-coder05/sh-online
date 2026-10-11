@@ -39,6 +39,18 @@ export type AgentShot = {
   outcome: AgentShotOutcome;
 };
 
+/**
+ * A message from a ghost (a dead player). Heckles are heard by everyone;
+ * whispers (which have a {@code recipient}) are only sent to the ghost and the
+ * recipient. {@code id} increases with each ghost message.
+ */
+export type GhostMessage = {
+  id: number;
+  ghost: string;
+  text: string;
+  recipient?: string;
+};
+
 export type GameState = {
   state: LobbyState;
   lastState: LobbyState;
@@ -67,6 +79,12 @@ export type GameState = {
   vetoOccurred: boolean;
   peek?: PolicyType[];
   agentShot?: AgentShot;
+  /** The most recent heckles from ghosts, oldest first. */
+  heckles?: GhostMessage[];
+  /** The whispers this player sent or received, oldest first. */
+  whispers?: GhostMessage[];
+  /** Whether this player is a ghost who has not yet whispered this round. */
+  canWhisper?: boolean;
 
   usernames?: string[];
   /** Maps from usernames to icon keys */

@@ -88,11 +88,14 @@ import Player from "./player/Player";
 import LoginPageContent from "./LoginPageContent";
 import Cookies from "js-cookie";
 import AnnouncementBox from "./util/AnnouncementBox";
+import GhostPanel from "./ghost/GhostPanel";
+import GhostWhisperPrompt from "./custom-alert/GhostWhisperPrompt";
 import { isVictoryState } from "./utils";
 import {
   AgentShot,
   AgentShotOutcome,
   GameState,
+  GhostMessage,
   LobbyState,
   Role,
   ServerRequestPayload,
@@ -215,6 +218,8 @@ class App extends Component<{}, AppState> {
   allAnimationsFinished: boolean = true;
   // Id of the latest secret agent shot seen, and whether an action prompt is currently open.
   latestAgentShotId: number = 0;
+  // Id of the latest ghost whisper seen.
+  latestWhisperId: number = 0;
   showingActionPrompt: boolean = false;
   gameOver: boolean = false;
 
@@ -1002,7 +1007,7 @@ class App extends Component<{}, AppState> {
         <ButtonPrompt
           label={"YOU HAVE BEEN EXECUTED"}
           headerText={
-            "Executed players may not speak, vote, or run for office. You should not reveal your identity to the group."
+            "You are now a ghost. You may not vote or run for office, but you can wander the room heckling everyone, and silently whisper to one living player each round."
           }
           buttonOnClick={this.hideAlertAndFinish}
         />,
@@ -1014,7 +1019,7 @@ class App extends Component<{}, AppState> {
           label={"EXECUTION RESULTS"}
           footerText={
             newState.targetUser +
-            " has been executed. They may no longer speak, vote, or run for office."
+            " has been executed. They may no longer vote or run for office, but will haunt the room as a ghost."
           }
           buttonOnClick={this.hideAlertAndFinish}
           buttonText={"OKAY"}
@@ -1190,7 +1195,7 @@ class App extends Component<{}, AppState> {
     if (died) {
       label = target === name ? "YOU HAVE BEEN SHOT" : "YOU SHOT A LIBERAL";
       message +=
-        " Dead players may not speak, vote, or run for office. You should not reveal any more information to the group.";
+        " You are now a ghost: you may not vote or run for office, but you can heckle everyone and silently whisper to one living player each round.";
     }
 
     return (
@@ -1211,6 +1216,38 @@ class App extends Component<{}, AppState> {
       </ButtonPrompt>
     );
   }
+
+  /**
+   * Returns the alert shown to a living player when a ghost whispers to them.
+   */
+  renderWhisperAlert(whisper: GhostMessage): React.JSX.Element {
+    return (
+      <ButtonPrompt
+        label={"A GHOST WHISPERS"}
+        headerText={`${whisper.ghost} whispers to you: "${whisper.text}"`}
+        footerText={"Only you can hear this whisper."}
+        buttonOnClick={this.hideAlertAndFinish}
+        buttonText={"OKAY"}
+      />
+    );
+  }
+
+  /**
+   * Opens the ghost's whisper prompt.
+   */
+  onClickWhisper = () => {
+    this.queueAlert(
+      <GhostWhisperPrompt
+        user={this.state.name}
+        gameState={this.state.gameState}
+        sendWSCommand={this.sendWSCommand}
+        onCancel={() => {
+          this.okMessageListeners = [];
+          this.hideAlertAndFinish();
+        }}
+      />
+    );
+  };
 
   /**
    * Returns true if this player is the living secret agent in an unfinished game.
@@ -1315,6 +1352,17 @@ class App extends Component<{}, AppState> {
         // The state-change handling below won't run, so re-prompt here.
         this.queueActionPrompt(newState);
       }
+    }
+
+    // Let this player hear any new whispers sent to them by ghosts.
+    const whispers = newState.whispers || [];
+    const previousWhisperId = this.latestWhisperId;
+    this.latestWhisperId = Math.max(0, ...whispers.map((w) => w.id));
+    if (oldState.state !== STATE_SETUP) {
+      // Don't replay old whispers when (re)joining a game.
+      whispers
+        .filter((w) => w.id > previousWhisperId && w.recipient === name)
+        .forEach((w) => this.queueAlert(this.renderWhisperAlert(w), false));
     }
 
     // Check for changes in enacted policies and election tracker.
@@ -1689,6 +1737,7 @@ class App extends Component<{}, AppState> {
                     this.tryOpenWebSocket(this.state.name, this.state.lobby);
                     this.hideAlertAndFinish();
                     this.latestAgentShotId = 0;
+                    this.latestWhisperId = 0;
                     this.setState({
                       page: PAGE.LOBBY,
                       gameState: DEFAULT_GAME_STATE,
@@ -1980,6 +2029,16 @@ class App extends Component<{}, AppState> {
         </div>
 
         <StatusBar>{this.state.statusBarText}</StatusBar>
+
+        <GhostPanel
+          user={this.state.name}
+          gameState={this.state.gameState}
+          sendWSCommand={this.sendWSCommand}
+          heckleDisabled={this.state.showAlert}
+          // Wait for animations to finish so that whisper prompts can't pile up in the queue.
+          whisperDisabled={!this.state.allAnimationsFinished}
+          onClickWhisper={this.onClickWhisper}
+        />
 
         <div style={{ display: "inline-block" }}>
           <div

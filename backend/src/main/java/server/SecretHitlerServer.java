@@ -40,6 +40,7 @@ public class SecretHitlerServer {
     public static final String PARAM_VETO = "veto";
     public static final String PARAM_CHOICE = "choice"; // the index of the chosen policy.
     public static final String PARAM_ICON = "icon";
+    public static final String PARAM_MESSAGE = "message"; // the text of a ghost's heckle or whisper.
 
     // Passed to client
     // The type of the packet tells the client how to parse the contents.
@@ -72,6 +73,8 @@ public class SecretHitlerServer {
     public static final String COMMAND_GET_INVESTIGATION = "get-investigation";
     public static final String COMMAND_REGISTER_PEEK = "register-peek";
     public static final String COMMAND_AGENT_SHOOT = "agent-shoot";
+    public static final String COMMAND_GHOST_HECKLE = "ghost-heckle";
+    public static final String COMMAND_GHOST_WHISPER = "ghost-whisper";
 
     public static final String COMMAND_END_TERM = "end-term";
 
@@ -707,6 +710,17 @@ public class SecretHitlerServer {
 
                     case COMMAND_AGENT_SHOOT: // params: PARAM_TARGET (String). The game verifies the sender is the agent.
                         lobby.game().agentShoot(name, message.getString(PARAM_TARGET));
+                        break;
+
+                    case COMMAND_GHOST_HECKLE: // params: PARAM_MESSAGE (String). The game verifies the sender is a ghost.
+                        // Heckles can be sent at any time, so an OK message could
+                        // close whatever alert the ghost is waiting on.
+                        sendOKMessage = false;
+                        lobby.game().heckle(name, message.getString(PARAM_MESSAGE));
+                        break;
+
+                    case COMMAND_GHOST_WHISPER: // params: PARAM_TARGET (String), PARAM_MESSAGE (String)
+                        lobby.game().whisper(name, message.getString(PARAM_TARGET), message.getString(PARAM_MESSAGE));
                         break;
 
                     case COMMAND_END_TERM:

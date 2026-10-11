@@ -208,8 +208,8 @@ export const SelectExecutionPrompt = (
         return (
           <>
             <p className={"left-align"}>
-              Choose a player to execute. That player can no longer speak, vote,
-              or run for office.
+              Choose a player to execute. That player can no longer vote or run
+              for office, but will haunt the room as a ghost.
             </p>
             <p className={"left-align highlight"}>
               The game ends and Liberals win if Hitler is executed.

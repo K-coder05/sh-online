@@ -46,6 +46,9 @@ public class SecretHitlerGame implements Serializable {
     public static final int PRESIDENT_DRAW_SIZE = 3;
     public static final int CHANCELLOR_DRAW_SIZE = 2;
 
+    public static final int MAX_GHOST_MESSAGE_LENGTH = 140;
+    public static final int MAX_HECKLES_KEPT = 30;
+
     // </editor-fold>
 
     /////////////////// Private Fields
@@ -94,6 +97,18 @@ public class SecretHitlerGame implements Serializable {
 
     // The most recent shot fired by the secret agent (null if none yet).
     private AgentShot lastAgentShot;
+
+    // The ids of the most recent heckle and whisper (0 if none yet). These are
+    // counted separately so that gaps in the public heckle ids don't reveal
+    // whispers.
+    private int lastHeckleId = 0;
+    private int lastWhisperId = 0;
+    // The most recent heckles from ghosts (up to MAX_HECKLES_KEPT), oldest first.
+    private List<GhostMessage> heckles = new ArrayList<>();
+    // Whispers from ghosts to living players, oldest first.
+    private List<GhostMessage> whispers = new ArrayList<>();
+    // Maps each ghost to the last round they whispered in.
+    private HashMap<String, Integer> lastWhisperRound = new HashMap<>();
 
     // </editor-fold>
 
@@ -161,6 +176,38 @@ public class SecretHitlerGame implements Serializable {
      */
     public AgentShot getLastAgentShot() {
         return lastAgentShot;
+    }
+
+    /**
+     * @return the most recent heckles from ghosts (up to MAX_HECKLES_KEPT), oldest
+     *         first.
+     */
+    public List<GhostMessage> getHeckles() {
+        return new ArrayList<>(heckles);
+    }
+
+    /**
+     * @param username the username of a player.
+     * @return the whispers sent or received by {@code username}, oldest first.
+     */
+    public List<GhostMessage> getWhispersFor(String username) {
+        List<GhostMessage> out = new ArrayList<>();
+        for (GhostMessage whisper : whispers) {
+            if (whisper.getGhost().equals(username) || whisper.getRecipient().equals(username)) {
+                out.add(whisper);
+            }
+        }
+        return out;
+    }
+
+    /**
+     * @param username the username of a player.
+     * @return true iff {@code username} is a ghost in an unfinished game who has
+     *         not yet whispered this round.
+     */
+    public boolean canWhisper(String username) {
+        return !hasGameFinished() && isGhost(username)
+                && !Integer.valueOf(round).equals(lastWhisperRound.get(username));
     }
 
     // </editor-fold>
@@ -1140,6 +1187,94 @@ public class SecretHitlerGame implements Serializable {
         didVetoOccurThisTurn = false;
         concludePresidentialActions();
         endPresidentialTerm();
+    }
+
+    // </editor-fold>
+
+    /////////////////// Ghosts
+    // <editor-fold desc="Ghosts">
+
+    /**
+     * A ghost heckles everyone.
+     *
+     * @param ghost the username of the ghost.
+     * @param text  the heckle.
+     * @throws IllegalStateException    if the game has finished.
+     * @throws IllegalArgumentException if {@code ghost} is not a dead player, or
+     *                                  if {@code text} is blank or longer than
+     *                                  MAX_GHOST_MESSAGE_LENGTH.
+     * @modifies this
+     * @effects records the heckle, trimmed of surrounding whitespace, forgetting
+     *          the oldest heckle if more than MAX_HECKLES_KEPT are recorded.
+     */
+    public void heckle(String ghost, String text) {
+        String message = validateGhostMessage(ghost, text);
+        heckles.add(new GhostMessage(++lastHeckleId, ghost, null, message));
+        if (heckles.size() > MAX_HECKLES_KEPT) {
+            heckles.remove(0);
+        }
+    }
+
+    /**
+     * A ghost silently whispers to a living player. Each ghost gets one whisper
+     * per round.
+     *
+     * @param ghost     the username of the ghost.
+     * @param recipient the username of the living player to whisper to.
+     * @param text      the whisper.
+     * @throws IllegalStateException    if the game has finished, or if the ghost
+     *                                  has already whispered this round.
+     * @throws IllegalArgumentException if {@code ghost} is not a dead player, if
+     *                                  {@code recipient} does not exist or is
+     *                                  dead, or if {@code text} is blank or
+     *                                  longer than MAX_GHOST_MESSAGE_LENGTH.
+     * @modifies this
+     * @effects records the whisper, trimmed of surrounding whitespace, and uses up
+     *          the ghost's whisper for this round.
+     */
+    public void whisper(String ghost, String recipient, String text) {
+        String message = validateGhostMessage(ghost, text);
+        if (!hasPlayer(recipient)) {
+            throw new IllegalArgumentException("Player " + recipient + " does not exist.");
+        } else if (!getPlayer(recipient).isAlive()) {
+            throw new IllegalArgumentException("Ghosts can only whisper to living players.");
+        } else if (!canWhisper(ghost)) {
+            throw new IllegalStateException("Ghosts can only whisper once per round.");
+        }
+        whispers.add(new GhostMessage(++lastWhisperId, ghost, recipient, message));
+        lastWhisperRound.put(ghost, round);
+    }
+
+    /**
+     * @return true iff {@code username} is a player in the game who is dead.
+     */
+    private boolean isGhost(String username) {
+        return hasPlayer(username) && !getPlayer(username).isAlive();
+    }
+
+    /**
+     * Checks that a ghost may send a message.
+     *
+     * @return the message, trimmed of surrounding whitespace.
+     * @throws IllegalStateException    if the game has finished.
+     * @throws IllegalArgumentException if {@code ghost} is not a dead player, or
+     *                                  if {@code text} is blank or longer than
+     *                                  MAX_GHOST_MESSAGE_LENGTH.
+     */
+    private String validateGhostMessage(String ghost, String text) {
+        if (hasGameFinished()) {
+            throw new IllegalStateException("Ghosts cannot speak once the game has finished.");
+        } else if (!isGhost(ghost)) {
+            throw new IllegalArgumentException("Only ghosts (dead players) can send ghost messages.");
+        }
+        String message = text == null ? "" : text.trim();
+        if (message.isEmpty()) {
+            throw new IllegalArgumentException("Ghost messages cannot be blank.");
+        } else if (message.length() > MAX_GHOST_MESSAGE_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Ghost messages can be at most " + MAX_GHOST_MESSAGE_LENGTH + " characters long.");
+        }
+        return message;
     }
 
     // </editor-fold>

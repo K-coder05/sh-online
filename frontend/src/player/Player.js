@@ -97,6 +97,16 @@ class Player extends Component {
     }
 
     /**
+     * @return {String} " ghost" if {@code this.props.isGhost} is true (the player wanders the room). Otherwise, "".
+     */
+    getGhostClass() {
+        if (this.props.isGhost) {
+            return " ghost";
+        }
+        return "";
+    }
+
+    /**
      * Gets the classname for the div if selectable.
      * @return {string} If currently selected, returns " selectable selected" to set the background color of the div.
      *                  Else if {@code this.props.useAsButton}, returns " selectable". Otherwise, returns "".
@@ -166,7 +176,7 @@ class Player extends Component {
 
         return (
             <div id="player-container"
-                className={this.getHighlight() + this.getClassName() + this.getButtonClass()}
+                className={this.getHighlight() + this.getClassName() + this.getButtonClass() + this.getGhostClass()}
                  onClick = {this.props.onClick}
                  disabled = {this.props.disabled}
             >
@@ -233,6 +243,7 @@ Player.defaultProps = {
     showVote: false,
     vote: false,
     icon: "p_default",
+    isGhost: false,
 };
 
 Player.propTypes = {
@@ -249,6 +260,7 @@ Player.propTypes = {
     showVote: PropTypes.bool,
     vote: PropTypes.bool,
     icon: PropTypes.string,
+    isGhost: PropTypes.bool,
 };
 
 export default Player;
