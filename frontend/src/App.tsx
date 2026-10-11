@@ -139,7 +139,6 @@ const DEFAULT_GAME_STATE: GameState = {
   icon: {},
 };
 
-const COOKIE_NAME = "name";
 const COOKIE_LOBBY = "lobby";
 
 if (DEBUG) {
@@ -237,14 +236,11 @@ class App extends Component<{}, AppState> {
   constructor(props: any) {
     super(props);
 
-    let name = Cookies.get(COOKIE_NAME) ? Cookies.get(COOKIE_NAME) : "";
     let lobby = Cookies.get(COOKIE_LOBBY) ? Cookies.get(COOKIE_LOBBY) : "";
 
     this.state = {
       ...defaultAppState,
-      joinName: name || "",
       joinLobby: lobby || "",
-      createLobbyName: name || "",
     };
 
     // The website uses Google Analytics!
@@ -649,8 +645,7 @@ class App extends Component<{}, AppState> {
                 "There was an error connecting to the server. Please try again.",
             });
           } else {
-            // Save the username and lobby login
-            Cookies.set(COOKIE_NAME, this.state.name, { expires: 7 });
+            // Save the lobby login
             Cookies.set(COOKIE_LOBBY, this.state.joinLobby);
           }
         }
@@ -687,8 +682,7 @@ class App extends Component<{}, AppState> {
                 category: "Lobby Created",
                 action: "Successfully created new lobby.",
               });
-              // Save the username and lobby login
-              Cookies.set(COOKIE_NAME, this.state.name, { expires: 7 });
+              // Save the lobby login
               Cookies.set(COOKIE_LOBBY, lobbyCode);
             }
           });
@@ -814,7 +808,7 @@ class App extends Component<{}, AppState> {
       return (
         <Player
           key={i}
-          name={i === 0 ? name : name + " [Host]"}
+          name={i === 0 ? name + " [Host]" : name}
           showRole={false}
           icon={this.state.icons[name]}
           isBusy={this.state.icons[name] === defaultPortrait}
