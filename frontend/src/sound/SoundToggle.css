@@ -1,0 +1,12 @@
+#sound-toggle {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 80; /* Above alerts, so the victory music can be muted. */
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 22px;
+  line-height: 1;
+  background: var(--buttonFill);
+  border-radius: 6px;
+}

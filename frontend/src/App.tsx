@@ -92,6 +92,14 @@ import GhostPanel from "./ghost/GhostPanel";
 import GhostWhisperPrompt from "./custom-alert/GhostWhisperPrompt";
 import { isVictoryState } from "./utils";
 import {
+  electionTrackerSound,
+  policySound,
+  soundBoard,
+  SoundEffect,
+  victorySound,
+} from "./sound";
+import SoundToggle from "./sound/SoundToggle";
+import {
   AgentShot,
   AgentShotOutcome,
   GameState,
@@ -220,6 +228,8 @@ class App extends Component<{}, AppState> {
   latestAgentShotId: number = 0;
   // Id of the latest ghost whisper seen.
   latestWhisperId: number = 0;
+  // Id of the latest ghost heckle seen.
+  latestHeckleId: number = 0;
   showingActionPrompt: boolean = false;
   gameOver: boolean = false;
 
@@ -259,6 +269,15 @@ class App extends Component<{}, AppState> {
     this.showChangeIconAlert = this.showChangeIconAlert.bind(this);
     this.updateChangeIconAlert = this.updateChangeIconAlert.bind(this);
     this.onClickChangeIcon = this.onClickChangeIcon.bind(this);
+
+    // Browsers only let audio start after the user interacts with the page.
+    const unlockSound = () => {
+      soundBoard.unlock();
+      document.removeEventListener("pointerdown", unlockSound);
+      document.removeEventListener("keydown", unlockSound);
+    };
+    document.addEventListener("pointerdown", unlockSound);
+    document.addEventListener("keydown", unlockSound);
 
     // Ping the server to wake it up if it's not currently being used
     // This reduces the delay users experience when starting lobbies
@@ -484,7 +503,8 @@ class App extends Component<{}, AppState> {
             target={message[PARAM_TARGET]}
             hideAlert={this.hideAlertAndFinish}
           />,
-          false
+          false,
+          SoundEffect.INVESTIGATION
         );
         break;
       case PACKET_PONG:
@@ -897,6 +917,7 @@ class App extends Component<{}, AppState> {
     return (
       <div className="App">
         <header className="App-header">SECRET-HITLER.ONLINE</header>
+        <SoundToggle />
 
         <CustomAlert show={this.state.showAlert}>
           {this.state.alertContent}
@@ -1011,7 +1032,8 @@ class App extends Component<{}, AppState> {
           }
           buttonOnClick={this.hideAlertAndFinish}
         />,
-        false
+        false,
+        SoundEffect.EXECUTION
       );
     } else {
       this.queueAlert(
@@ -1032,7 +1054,8 @@ class App extends Component<{}, AppState> {
             players={[newState.targetUser!]}
           />
         </ButtonPrompt>,
-        false
+        false,
+        SoundEffect.EXECUTION
       );
     }
   }
@@ -1347,7 +1370,11 @@ class App extends Component<{}, AppState> {
         this.hideAlertAndFinish(false);
       }
       this.queueEventUpdate("SHOTS FIRED");
-      this.queueAlert(this.renderAgentShotAlert(name, newState, shot!), false);
+      this.queueAlert(
+        this.renderAgentShotAlert(name, newState, shot!),
+        false,
+        SoundEffect.GUNSHOT
+      );
       if (newState.state === oldState.state) {
         // The state-change handling below won't run, so re-prompt here.
         this.queueActionPrompt(newState);
@@ -1362,7 +1389,24 @@ class App extends Component<{}, AppState> {
       // Don't replay old whispers when (re)joining a game.
       whispers
         .filter((w) => w.id > previousWhisperId && w.recipient === name)
-        .forEach((w) => this.queueAlert(this.renderWhisperAlert(w), false));
+        .forEach((w) =>
+          this.queueAlert(
+            this.renderWhisperAlert(w),
+            false,
+            SoundEffect.WHISPER
+          )
+        );
+    }
+
+    // Heckles show up in the ghost panel right away, so they're heard right away too.
+    const heckles = newState.heckles || [];
+    const previousHeckleId = this.latestHeckleId;
+    this.latestHeckleId = Math.max(0, ...heckles.map((h) => h.id));
+    if (
+      oldState.state !== STATE_SETUP && // Don't replay old heckles when (re)joining a game.
+      this.latestHeckleId > previousHeckleId
+    ) {
+      soundBoard.play(SoundEffect.HECKLE);
     }
 
     // Check for changes in enacted policies and election tracker.
@@ -1397,7 +1441,9 @@ class App extends Component<{}, AppState> {
             <ElectionTrackerAlert
               trackerPosition={trackerPosition}
               closeAlert={this.hideAlertAndFinish}
-            />
+            />,
+            true,
+            electionTrackerSound(trackerPosition)
           );
         }
       }
@@ -1413,7 +1459,9 @@ class App extends Component<{}, AppState> {
           <PolicyEnactedAlert
             hideAlert={this.hideAlertAndFinish}
             policyType={newState.lastPolicy}
-          />
+          />,
+          true,
+          policySound(newState.lastPolicy)
         );
       }
 
@@ -1449,7 +1497,8 @@ class App extends Component<{}, AppState> {
                   this.hideAlertAndFinish();
                 }}
               />,
-              false
+              false,
+              SoundEffect.ROLE_REVEAL
             );
           }
 
@@ -1493,6 +1542,7 @@ class App extends Component<{}, AppState> {
           break;
 
         case STATE_LEGISLATIVE_PRESIDENT_VETO:
+          this.queueSound(SoundEffect.VETO);
           this.queueStatusMessage(
             "Chancellor has motioned to veto the agenda. Waiting for the president to decide."
           );
@@ -1601,7 +1651,8 @@ class App extends Component<{}, AppState> {
                       players={[newState.targetUser!]}
                     />
                   </ButtonPrompt>,
-                  true
+                  true,
+                  SoundEffect.INVESTIGATION
                 );
               } else {
                 // Is President; do nothing because we handle the
@@ -1709,7 +1760,11 @@ class App extends Component<{}, AppState> {
           if (DEBUG) {
             console.log("Player ordering: " + players);
           }
+          const endingSound = victorySound(newState.state);
           this.addAnimationToQueue(() => {
+            if (endingSound) {
+              soundBoard.play(endingSound);
+            }
             this.setState({
               alertContent: (
                 <ButtonPrompt
@@ -1738,6 +1793,7 @@ class App extends Component<{}, AppState> {
                     this.hideAlertAndFinish();
                     this.latestAgentShotId = 0;
                     this.latestWhisperId = 0;
+                    this.latestHeckleId = 0;
                     this.setState({
                       page: PAGE.LOBBY,
                       gameState: DEFAULT_GAME_STATE,
@@ -1834,6 +1890,7 @@ class App extends Component<{}, AppState> {
   showVotes(newState: GameState) {
     this.setState({ statusBarText: "Tallying votes..." });
     setTimeout(() => {
+      soundBoard.play(SoundEffect.VOTES_REVEALED);
       this.setState({ showVotes: true });
     }, 1000);
     // Calculate final result:
@@ -1849,10 +1906,12 @@ class App extends Component<{}, AppState> {
     });
     setTimeout(() => {
       if (yesVotes > noVotes) {
+        soundBoard.play(SoundEffect.VOTE_PASSED);
         this.setState({
           statusBarText: yesVotes + " - " + noVotes + ": Vote passed",
         });
       } else {
+        soundBoard.play(SoundEffect.VOTE_FAILED);
         this.setState({
           statusBarText: yesVotes + " - " + noVotes + ": Vote failed",
         });
@@ -1928,13 +1987,21 @@ class App extends Component<{}, AppState> {
    * Adds a CustomAlert to the animation queue.
    * @param content {html} the contents to be shown in the AlertBox.
    * @param closeOnOK {boolean} whether to close the alert when the server responds with an ok message. (default = true)
+   * @param sound {SoundEffect} a sound effect to play when the alert appears. (optional)
    * @effects Adds a new function to the animation queue that, when called, causes a CustomAlert with the
    *          given {@code content} to appear. If {@code closeOnOK} is true, once shown, the alert box will
    *          be closed when the server responds with an 'ok' to any command. (There will be a short delay before the
    *          animation queue advances if not waiting for a server response.)
    */
-  queueAlert(content: React.JSX.Element, closeOnOK = true) {
+  queueAlert(
+    content: React.JSX.Element,
+    closeOnOK = true,
+    sound?: SoundEffect
+  ) {
     this.addAnimationToQueue(() => {
+      if (sound) {
+        soundBoard.play(sound);
+      }
       this.setState({
         alertContent: content,
         showAlert: true,
@@ -1967,6 +2034,10 @@ class App extends Component<{}, AppState> {
         return;
       }
       this.showingActionPrompt = true;
+      if (!isAgentPrompt) {
+        // The agent opened their own prompt, so they don't need a nudge.
+        soundBoard.play(SoundEffect.PROMPT);
+      }
       this.setState({
         alertContent: content,
         showAlert: true,
@@ -1992,6 +2063,19 @@ class App extends Component<{}, AppState> {
     });
   }
 
+  /**
+   * Adds a sound effect to the animation queue.
+   * @param sound the sound effect to play.
+   * @effects Adds a new function to the animation queue that, when called, plays the sound then instantly
+   *          advances the animation queue.
+   */
+  queueSound(sound: SoundEffect) {
+    this.addAnimationToQueue(() => {
+      soundBoard.play(sound);
+      this.onAnimationFinish();
+    });
+  }
+
   // </editor-fold>
 
   /**
@@ -2001,6 +2085,7 @@ class App extends Component<{}, AppState> {
     return (
       <div className="App" style={{ textAlign: "center" }}>
         <header className="App-header">SECRET-HITLER.ONLINE</header>
+        <SoundToggle />
 
         <CustomAlert show={this.state.showAlert}>
           {this.state.alertContent}
