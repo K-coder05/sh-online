@@ -3,6 +3,7 @@ package server;
 import game.datastructures.Identity;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
+import io.javalin.http.staticfiles.Location;
 import io.javalin.websocket.WsCloseContext;
 import io.javalin.websocket.WsConnectContext;
 import io.javalin.websocket.WsContext;
@@ -120,29 +121,7 @@ public class SecretHitlerServer {
         removeInactiveLobbies(); // immediately clean in case of redundant lobbies.
 
         // Only initialize Javalin communication after the database has been queried.
-        Javalin serverApp = Javalin.create(config -> {
-            config.plugins.enableCors(cors -> {
-                if (ApplicationConfig.DEBUG) {
-                    cors.add(it -> {
-                        it.anyHost();
-                    });
-                } else {
-                    cors.add(it -> {
-                        it.allowHost("https://secret-hitler.online");
-                    });
-                }
-            });
-        }).start(getHerokuAssignedPort());
-
-        serverApp.get("/check-login", SecretHitlerServer::checkLogin); // Checks if a login is valid.
-        serverApp.get("/new-lobby", SecretHitlerServer::createNewLobby); // Creates and returns the code for a new lobby
-        serverApp.get("/ping", SecretHitlerServer::ping);
-
-        serverApp.ws("/game", wsHandler -> {
-            wsHandler.onConnect(SecretHitlerServer::onWebsocketConnect);
-            wsHandler.onMessage(SecretHitlerServer::onWebSocketMessage);
-            wsHandler.onClose(SecretHitlerServer::onWebSocketClose);
-        });
+        createApp(ApplicationConfig.STATIC_FILES_DIR).start(getHerokuAssignedPort());
 
         // Add hook for termination that backs up the lobbies to the database.
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -171,6 +150,46 @@ public class SecretHitlerServer {
                 }
             }
         }, delayMs, periodMs);
+    }
+
+    /**
+     * Creates the (unstarted) Javalin server with all game routes registered.
+     *
+     * @param staticFilesDir path to a built frontend to serve from the same origin
+     *                       (for self-hosting), or null to serve the API only.
+     */
+    public static Javalin createApp(String staticFilesDir) {
+        Javalin serverApp = Javalin.create(config -> {
+            if (staticFilesDir != null) {
+                config.staticFiles.add(staticFiles -> {
+                    staticFiles.hostedPath = "/";
+                    staticFiles.directory = staticFilesDir;
+                    staticFiles.location = Location.EXTERNAL;
+                });
+            }
+            config.plugins.enableCors(cors -> {
+                if (ApplicationConfig.DEBUG) {
+                    cors.add(it -> {
+                        it.anyHost();
+                    });
+                } else {
+                    cors.add(it -> {
+                        it.allowHost("https://secret-hitler.online");
+                    });
+                }
+            });
+        });
+
+        serverApp.get("/check-login", SecretHitlerServer::checkLogin); // Checks if a login is valid.
+        serverApp.get("/new-lobby", SecretHitlerServer::createNewLobby); // Creates and returns the code for a new lobby
+        serverApp.get("/ping", SecretHitlerServer::ping);
+
+        serverApp.ws("/game", wsHandler -> {
+            wsHandler.onConnect(SecretHitlerServer::onWebsocketConnect);
+            wsHandler.onMessage(SecretHitlerServer::onWebSocketMessage);
+            wsHandler.onClose(SecretHitlerServer::onWebSocketClose);
+        });
+        return serverApp;
     }
 
     /**

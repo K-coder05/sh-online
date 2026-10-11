@@ -15,6 +15,9 @@ There are instructions on how to play the game provided on the website, and plen
 
 For more information, read the [official rulebook here](https://www.secrethitler.com/assets/Secret_Hitler_Rules.pdf).
 
+### Host your own server
+Want to run your own (or a modified) copy for your friends? See [SELF_HOSTING.md](SELF_HOSTING.md).
+
 ## About this project
 ### Technical Details
 The Java server is divided into the [game simulation](src/main/java/game) and the [REST API](src/main/java/server). Communication between the server and client is done via websocket and HTTP requests, using the [Javalin library](https://javalin.io/).

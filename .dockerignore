@@ -1,0 +1,8 @@
+**/node_modules
+**/.git
+frontend/build
+backend/build
+backend/.gradle
+backend/target
+frontend/.env.local
+frontend/.env.dev

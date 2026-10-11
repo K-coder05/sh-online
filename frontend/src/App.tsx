@@ -44,6 +44,7 @@ import {
   STATE_LIBERAL_VICTORY_EXECUTION,
   STATE_LIBERAL_VICTORY_POLICY,
   WEBSOCKET_HEADER,
+  SITE_URL,
   DEBUG,
   PACKET_PONG,
   PING_INTERVAL,
@@ -909,7 +910,7 @@ class App extends Component<{}, AppState> {
             <textarea
               id="linkText"
               readOnly={true}
-              value={"https://secret-hitler.online/?lobby=" + this.state.lobby}
+              value={SITE_URL + "/?lobby=" + this.state.lobby}
             />
             <button onClick={this.onClickCopy}>COPY</button>
           </div>
