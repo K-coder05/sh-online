@@ -41,6 +41,7 @@ public class SecretHitlerServer {
     public static final String PARAM_CHOICE = "choice"; // the index of the chosen policy.
     public static final String PARAM_ICON = "icon";
     public static final String PARAM_MESSAGE = "message"; // the text of a ghost's heckle or whisper.
+    public static final String PARAM_EMOTE = "emote"; // the name of an emote.
 
     // Passed to client
     // The type of the packet tells the client how to parse the contents.
@@ -75,6 +76,7 @@ public class SecretHitlerServer {
     public static final String COMMAND_AGENT_SHOOT = "agent-shoot";
     public static final String COMMAND_GHOST_HECKLE = "ghost-heckle";
     public static final String COMMAND_GHOST_WHISPER = "ghost-whisper";
+    public static final String COMMAND_EMOTE = "emote";
 
     public static final String COMMAND_END_TERM = "end-term";
 
@@ -721,6 +723,18 @@ public class SecretHitlerServer {
 
                     case COMMAND_GHOST_WHISPER: // params: PARAM_TARGET (String), PARAM_MESSAGE (String)
                         lobby.game().whisper(name, message.getString(PARAM_TARGET), message.getString(PARAM_MESSAGE));
+                        break;
+
+                    case COMMAND_EMOTE: // params: PARAM_EMOTE (String). Any player, living or dead.
+                        // Like heckles, emotes can be sent at any time.
+                        sendOKMessage = false;
+                        if (!lobby.isInGame() || lobby.game().hasGameFinished()) {
+                            // A late emote (e.g. sent just as the game ended) is dropped
+                            // rather than closing the player's connection.
+                            updateUsers = false;
+                            break;
+                        }
+                        lobby.game().emote(name, message.getString(PARAM_EMOTE));
                         break;
 
                     case COMMAND_END_TERM:

@@ -187,3 +187,31 @@
     0% {top: 43%; opacity: 1; visibility: visible}
     100% {top:43%; opacity: 0; visibility: hidden}
 }
+
+/* An emote popping up over its sender's player tile. */
+#player-emote {
+    position: absolute;
+    top: 10%;
+    left: 15%;
+    width: 70%;
+    height: auto;
+    z-index: 5;
+    pointer-events: none;
+    border-radius: 10%;
+    filter: drop-shadow(0 0 4px var(--textShadowed));
+    animation: emote-pop ease-out forwards; /* Duration set to EMOTE_DISPLAY_MS by Player.js. */
+}
+
+@keyframes emote-pop {
+    0%   {opacity: 0; transform: scale(0.3) translateY(20%);}
+    10%  {opacity: 1; transform: scale(1.1) translateY(0);}
+    20%  {transform: scale(1);}
+    80%  {opacity: 1; transform: translateY(-10%);}
+    100% {opacity: 0; transform: translateY(-25%);}
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #player-emote {
+        animation: none;
+    }
+}

@@ -51,6 +51,16 @@ export type GhostMessage = {
   recipient?: string;
 };
 
+/**
+ * A reaction image sent by a player for everyone to see. {@code id} increases
+ * with each emote.
+ */
+export type Emote = {
+  id: number;
+  player: string;
+  emote: string;
+};
+
 export type GameState = {
   state: LobbyState;
   lastState: LobbyState;
@@ -85,6 +95,8 @@ export type GameState = {
   whispers?: GhostMessage[];
   /** Whether this player is a ghost who has not yet whispered this round. */
   canWhisper?: boolean;
+  /** The most recent emotes, oldest first. */
+  emotes?: Emote[];
 
   usernames?: string[];
   /** Maps from usernames to icon keys */

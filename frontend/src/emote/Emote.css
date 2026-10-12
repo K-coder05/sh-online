@@ -1,0 +1,33 @@
+@import '../variables.css';
+
+#emote-bar {
+    position: fixed;
+    bottom: 8px;
+    left: 8px;
+    z-index: 80; /* Above alerts, so players can emote at any time. */
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    background: var(--backgroundLight);
+    border-radius: 8px;
+}
+
+#emote-bar .emote-button {
+    margin: 0;
+    padding: 2px;
+    width: calc(24px + 3vmin);
+    height: calc(24px + 3vmin);
+    border-radius: 6px;
+    box-shadow: 0 3px 0 var(--buttonShadowFill);
+}
+
+#emote-bar .emote-button:disabled {
+    box-shadow: 0 3px 0 var(--buttonDisabledShadowFill);
+}
+
+#emote-bar .emote-button img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}

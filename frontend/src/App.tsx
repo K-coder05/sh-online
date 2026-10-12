@@ -89,6 +89,9 @@ import LoginPageContent from "./LoginPageContent";
 import Cookies from "js-cookie";
 import AnnouncementBox from "./util/AnnouncementBox";
 import GhostPanel from "./ghost/GhostPanel";
+import EmoteBar from "./emote/EmoteBar";
+import { EMOTE_DISPLAY_MS } from "./emote/emotes";
+import { newEmotesByPlayer } from "./emote/newEmotes";
 import GhostWhisperPrompt from "./custom-alert/GhostWhisperPrompt";
 import { isVictoryState } from "./utils";
 import {
@@ -102,6 +105,7 @@ import SoundToggle from "./sound/SoundToggle";
 import {
   AgentShot,
   AgentShotOutcome,
+  Emote,
   GameState,
   GhostMessage,
   LobbyState,
@@ -181,6 +185,10 @@ type AppState = {
   eventBarMessage: string;
   statusBarText: string;
   allAnimationsFinished: boolean;
+  /** Maps players to the emote currently shown over their tile. */
+  shownEmotes: Record<string, Emote>;
+  /** Whether the victory alert is showing (emotes can't be sent once it is). */
+  showingVictory: boolean;
 };
 
 const defaultAppState: AppState = {
@@ -212,6 +220,8 @@ const defaultAppState: AppState = {
   eventBarMessage: "",
   statusBarText: "---",
   allAnimationsFinished: true,
+  shownEmotes: {},
+  showingVictory: false,
 };
 
 class App extends Component<{}, AppState> {
@@ -229,6 +239,8 @@ class App extends Component<{}, AppState> {
   latestWhisperId: number = 0;
   // Id of the latest ghost heckle seen.
   latestHeckleId: number = 0;
+  // Id of the latest emote seen.
+  latestEmoteId: number = 0;
   showingActionPrompt: boolean = false;
   gameOver: boolean = false;
 
@@ -1250,6 +1262,31 @@ class App extends Component<{}, AppState> {
   }
 
   /**
+   * Shows emotes over their senders' tiles, each replacing the sender's current
+   * emote, and hides each one after EMOTE_DISPLAY_MS.
+   */
+  showEmotes(emotes: Record<string, Emote>) {
+    if (Object.keys(emotes).length === 0) {
+      return;
+    }
+    this.setState((state) => ({
+      shownEmotes: { ...state.shownEmotes, ...emotes },
+    }));
+    Object.values(emotes).forEach((emote) =>
+      setTimeout(() => {
+        this.setState((state) => {
+          if (state.shownEmotes[emote.player]?.id !== emote.id) {
+            return null; // Already replaced by a newer emote.
+          }
+          const shownEmotes = { ...state.shownEmotes };
+          delete shownEmotes[emote.player];
+          return { shownEmotes };
+        });
+      }, EMOTE_DISPLAY_MS)
+    );
+  }
+
+  /**
    * Opens the ghost's whisper prompt.
    */
   onClickWhisper = () => {
@@ -1401,6 +1438,17 @@ class App extends Component<{}, AppState> {
       this.latestHeckleId > previousHeckleId
     ) {
       soundBoard.play(SoundEffect.HECKLE);
+    }
+
+    // Emotes pop up over their sender's tile right away, outside the animation queue.
+    const newEmotes = newEmotesByPlayer(newState.emotes, this.latestEmoteId);
+    this.latestEmoteId = Math.max(
+      this.latestEmoteId,
+      ...(newState.emotes || []).map((e) => e.id)
+    );
+    if (oldState.state !== STATE_SETUP) {
+      // Don't replay old emotes when (re)joining a game.
+      this.showEmotes(newEmotes);
     }
 
     // Check for changes in enacted policies and election tracker.
@@ -1788,6 +1836,7 @@ class App extends Component<{}, AppState> {
                     this.latestAgentShotId = 0;
                     this.latestWhisperId = 0;
                     this.latestHeckleId = 0;
+                    this.latestEmoteId = 0;
                     this.setState({
                       page: PAGE.LOBBY,
                       gameState: DEFAULT_GAME_STATE,
@@ -1796,6 +1845,8 @@ class App extends Component<{}, AppState> {
                       electionTracker: 0,
                       drawDeckSize: 17,
                       discardDeckSize: 0,
+                      shownEmotes: {},
+                      showingVictory: false,
                     });
                   }}
                 >
@@ -1811,6 +1862,8 @@ class App extends Component<{}, AppState> {
                 </ButtonPrompt>
               ),
               showAlert: true,
+              // Hide the emote bar only now, so that it doesn't give away the result early.
+              showingVictory: true,
             });
           });
           this.gameOver = true;
@@ -2104,10 +2157,18 @@ class App extends Component<{}, AppState> {
             showVotes={this.state.showVotes}
             showBusy={this.state.allAnimationsFinished} // Only show busy when there isn't an active animation.
             playerDisabledFilter={DISABLE_EXECUTED_PLAYERS}
+            emotes={this.state.shownEmotes}
           />
         </div>
 
         <StatusBar>{this.state.statusBarText}</StatusBar>
+
+        <EmoteBar
+          user={this.state.name}
+          gameState={this.state.gameState}
+          sendWSCommand={this.sendWSCommand}
+          hidden={this.state.showingVictory}
+        />
 
         <GhostPanel
           user={this.state.name}

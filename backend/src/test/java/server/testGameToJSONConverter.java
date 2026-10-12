@@ -113,4 +113,21 @@ public class testGameToJSONConverter {
         game.whisper(ghost, living, "Psst.");
         assertFalse(GameToJSONConverter.convert(game, ghost).getBoolean("canWhisper"));
     }
+
+    @Test
+    public void everyoneSeesTheLatestEmotes() {
+        SecretHitlerGame game = newGame(5);
+        assertEquals(0, GameToJSONConverter.convert(game, "0").getJSONArray("emotes").length());
+
+        game.emote("3", "salute");
+
+        for (String viewer : new String[] {"0", "3"}) {
+            JSONArray emotes = GameToJSONConverter.convert(game, viewer).getJSONArray("emotes");
+            assertEquals(1, emotes.length());
+            JSONObject emote = emotes.getJSONObject(0);
+            assertEquals(1, emote.getInt("id"));
+            assertEquals("3", emote.getString("player"));
+            assertEquals("salute", emote.getString("emote"));
+        }
+    }
 }

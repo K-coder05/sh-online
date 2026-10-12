@@ -16,7 +16,7 @@ import {
   STATE_CHANCELLOR_VOTING,
 } from "../constants";
 import "./PlayerDisplay.css";
-import { GameState, Role } from "../types";
+import { Emote, GameState, Role } from "../types";
 import { doesHitlerKnowFascists, isGhost, isVictoryState } from "../utils";
 
 // <editor-fold desc="Player Filters">
@@ -110,6 +110,8 @@ type PlayerDisplayProps = {
   showRoles?: boolean;
   showBusy?: boolean;
   includeUser?: boolean;
+  /** Maps players to the emote currently shown over their tile. */
+  emotes?: Record<string, Emote>;
 };
 
 const defaultProps: Partial<PlayerDisplayProps> = {
@@ -310,6 +312,7 @@ export default function PlayerDisplay(
               vote={props.gameState.userVotes[playerName]}
               icon={props.gameState.icon[playerName]}
               isGhost={isGhost(playerName, props.gameState)}
+              emote={props.emotes && props.emotes[playerName]}
             />
           </div>
         );

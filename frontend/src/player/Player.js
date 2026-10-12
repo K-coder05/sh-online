@@ -16,6 +16,7 @@ import IconBusy from "../assets/player-icon-busy.png";
 import YesVote from "../assets/player-icon-ja.png";
 import NoVote from "../assets/player-icon-nein.png";
 import portraits, {portraitsAltText} from "../assets";
+import {EMOTE_DISPLAY_MS, emoteImages} from "../emote/emotes";
 
 const LIBERAL = "LIBERAL";
 const FASCIST = "FASCIST";
@@ -207,6 +208,16 @@ class Player extends Component {
 
                 {identity_components}
 
+                {this.props.emote &&
+                    // Keyed by id so that each new emote replays the animation.
+                    <img id="player-emote"
+                         key={this.props.emote.id}
+                         style={{animationDuration: EMOTE_DISPLAY_MS + "ms"}}
+                         src={emoteImages[this.props.emote.emote]}
+                         alt={this.props.name + " emotes: " + this.props.emote.emote}
+                    />
+                }
+
                 <Textfit id={"player-name"}
                          className={this.getClassName() + " force-update"}
                          mode="multi"
@@ -244,6 +255,7 @@ Player.defaultProps = {
     vote: false,
     icon: "p_default",
     isGhost: false,
+    emote: undefined,
 };
 
 Player.propTypes = {
@@ -261,6 +273,11 @@ Player.propTypes = {
     vote: PropTypes.bool,
     icon: PropTypes.string,
     isGhost: PropTypes.bool,
+    emote: PropTypes.shape({
+        id: PropTypes.number,
+        player: PropTypes.string,
+        emote: PropTypes.string,
+    }),
 };
 
 export default Player;

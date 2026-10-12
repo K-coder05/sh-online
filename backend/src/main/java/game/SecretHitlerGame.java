@@ -48,6 +48,11 @@ public class SecretHitlerGame implements Serializable {
 
     public static final int MAX_GHOST_MESSAGE_LENGTH = 140;
     public static final int MAX_HECKLES_KEPT = 30;
+    public static final int MAX_EMOTES_KEPT = 20;
+
+    // The names of the emotes players can send.
+    public static final List<String> EMOTES = Collections.unmodifiableList(
+            Arrays.asList("thumbsup", "thumbsdown", "wave", "salute", "fazeup", "middlefinger"));
 
     // </editor-fold>
 
@@ -109,6 +114,11 @@ public class SecretHitlerGame implements Serializable {
     private List<GhostMessage> whispers = new ArrayList<>();
     // Maps each ghost to the last round they whispered in.
     private HashMap<String, Integer> lastWhisperRound = new HashMap<>();
+
+    // The id of the most recent emote (0 if none yet).
+    private int lastEmoteId = 0;
+    // The most recent emotes (up to MAX_EMOTES_KEPT), oldest first.
+    private List<Emote> emotes = new ArrayList<>();
 
     // </editor-fold>
 
@@ -208,6 +218,13 @@ public class SecretHitlerGame implements Serializable {
     public boolean canWhisper(String username) {
         return !hasGameFinished() && isGhost(username)
                 && !Integer.valueOf(round).equals(lastWhisperRound.get(username));
+    }
+
+    /**
+     * @return the most recent emotes (up to MAX_EMOTES_KEPT), oldest first.
+     */
+    public List<Emote> getEmotes() {
+        return new ArrayList<>(emotes);
     }
 
     // </editor-fold>
@@ -1275,6 +1292,38 @@ public class SecretHitlerGame implements Serializable {
                     "Ghost messages can be at most " + MAX_GHOST_MESSAGE_LENGTH + " characters long.");
         }
         return message;
+    }
+
+    // </editor-fold>
+
+    /////////////////// Emotes
+    // <editor-fold desc="Emotes">
+
+    /**
+     * A player sends an emote for everyone to see.
+     *
+     * @param username the username of the player.
+     * @param emote    the name of the emote.
+     * @throws IllegalStateException    if the game has finished.
+     * @throws IllegalArgumentException if {@code username} is not a player in
+     *                                  the game (living or dead), or if
+     *                                  {@code emote} is not one of EMOTES.
+     * @modifies this
+     * @effects records the emote, forgetting the oldest emote if more than
+     *          MAX_EMOTES_KEPT are recorded.
+     */
+    public void emote(String username, String emote) {
+        if (hasGameFinished()) {
+            throw new IllegalStateException("Emotes cannot be sent once the game has finished.");
+        } else if (!hasPlayer(username)) {
+            throw new IllegalArgumentException("Player " + username + " does not exist.");
+        } else if (!EMOTES.contains(emote)) {
+            throw new IllegalArgumentException("Unknown emote " + emote + ".");
+        }
+        emotes.add(new Emote(++lastEmoteId, username, emote));
+        if (emotes.size() > MAX_EMOTES_KEPT) {
+            emotes.remove(0);
+        }
     }
 
     // </editor-fold>

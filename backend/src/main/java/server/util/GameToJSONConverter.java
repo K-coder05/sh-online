@@ -1,6 +1,7 @@
 package server.util;
 
 import game.AgentShot;
+import game.Emote;
 import game.GameState;
 import game.GhostMessage;
 import game.SecretHitlerGame;
@@ -73,6 +74,9 @@ public class GameToJSONConverter {
      *         Whispers are never sent to anyone else.
      *         - {@code canWhisper}: Whether the user is a ghost who has not yet
      *         whispered this round.
+     *         - {@code emotes}: The most recent emotes, oldest first, with
+     *         properties {@code id} (int, increases with each emote),
+     *         {@code player}, and {@code emote} (the emote's name).
      */
     public static JSONObject convert(SecretHitlerGame game, String userName) {
         if (game == null) {
@@ -144,6 +148,7 @@ public class GameToJSONConverter {
         out.put("heckles", convertGhostMessages(game.getHeckles()));
         out.put("whispers", convertGhostMessages(game.getWhispersFor(userName)));
         out.put("canWhisper", game.canWhisper(userName));
+        out.put("emotes", convertEmotes(game.getEmotes()));
 
         if (game.getState() == GameState.LEGISLATIVE_PRESIDENT) {
             out.put("presidentChoices", convertPolicyListToStringArray(game.getPresidentLegislativeChoices()));
@@ -173,6 +178,22 @@ public class GameToJSONConverter {
             if (message.isWhisper()) {
                 obj.put("recipient", message.getRecipient());
             }
+            out.put(obj);
+        }
+        return out;
+    }
+
+    /**
+     * Converts emotes into a JSONArray of objects with properties {@code id},
+     * {@code player}, and {@code emote}.
+     */
+    private static JSONArray convertEmotes(List<Emote> emotes) {
+        JSONArray out = new JSONArray();
+        for (Emote emote : emotes) {
+            JSONObject obj = new JSONObject();
+            obj.put("id", emote.getId());
+            obj.put("player", emote.getPlayer());
+            obj.put("emote", emote.getEmote());
             out.put(obj);
         }
         return out;

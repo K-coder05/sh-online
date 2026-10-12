@@ -10,3 +10,13 @@ declare module "*.svg" {
 
 // TODO: Delete this once this package is removed.
 declare module "react-twitter-embed";
+
+declare module "*.webp" {
+  const value: string;
+  export = value;
+}
+
+declare module "*.jpg" {
+  const value: string;
+  export = value;
+}
