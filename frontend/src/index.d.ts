@@ -16,6 +16,11 @@ declare module "*.webp" {
   export = value;
 }
 
+declare module "*.mp3" {
+  const value: string;
+  export = value;
+}
+
 declare module "*.jpg" {
   const value: string;
   export = value;

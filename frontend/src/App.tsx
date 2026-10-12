@@ -96,6 +96,7 @@ import GhostWhisperPrompt from "./custom-alert/GhostWhisperPrompt";
 import { isVictoryState } from "./utils";
 import {
   electionTrackerSound,
+  musicPlayer,
   policySound,
   soundBoard,
   SoundEffect,
@@ -286,6 +287,19 @@ class App extends Component<{}, AppState> {
     };
     document.addEventListener("pointerdown", unlockSound);
     document.addEventListener("keydown", unlockSound);
+    // Touch devices only allow playback from some events (e.g. a tap's click,
+    // not its pointerdown), so keep trying until the music starts.
+    const musicEvents = ["pointerdown", "keydown", "click", "touchend"];
+    const startMusic = () => {
+      musicPlayer.start().then((started) => {
+        if (started) {
+          musicEvents.forEach((e) =>
+            document.removeEventListener(e, startMusic)
+          );
+        }
+      });
+    };
+    musicEvents.forEach((e) => document.addEventListener(e, startMusic));
 
     // Ping the server to wake it up if it's not currently being used
     // This reduces the delay users experience when starting lobbies
