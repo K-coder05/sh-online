@@ -1,6 +1,6 @@
 import fazeup from "../assets/emotes/fazeup.webp";
 import middlefinger from "../assets/emotes/middlefinger.png";
-import salute from "../assets/emotes/salute.jpg";
+import salute from "../assets/emotes/salute.png";
 import thumbsdown from "../assets/emotes/thumbsdown.webp";
 import thumbsup from "../assets/emotes/thumbsup.webp";
 import wave from "../assets/emotes/wave.webp";

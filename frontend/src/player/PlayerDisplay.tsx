@@ -183,9 +183,10 @@ export default function PlayerDisplay(
         busyPlayers.add(game[PARAM_CHANCELLOR]);
         break;
       case STATE_CHANCELLOR_VOTING:
+        // Iterate over the displayed players only, which may be a subset of the full player order.
         let playerOrder = getPlayerOrder();
         let i = 0;
-        for (i; i < game.playerOrder.length; i++) {
+        for (i; i < playerOrder.length; i++) {
           let name = playerOrder[i];
           let isAlive = game.players[name].alive;
           if (!game.userVotes.hasOwnProperty(name) && isAlive) {
